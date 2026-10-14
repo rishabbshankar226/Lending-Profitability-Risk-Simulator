@@ -74,7 +74,7 @@ python -m lending_simulator.cli --assumptions path/to/manifest.json --output art
 
 Start with the decision summary and three primary metrics. **Recommended policy** compares all three policies; **Viewed policy** immediately selects the applied portfolio used by the metrics, charts and exports. The summary shows full-runoff operating profit, the cash cushion or shortfall relative to the floor, and credit-loss headroom or excess in percentage points. Actual minimum cash, loss ratio and both limits remain visible. **Applied inputs** in the toolbar retains the last successful run while you edit the sidebar.
 
-Dashboard percentage labels below 0.01% retain their nonzero sign as `<0.01%` or `−<0.01%`; exact zero remains `0.00%`. Calculations and exports keep their existing precision.
+Dashboard percentage labels below 0.01% retain their nonzero sign as `<0.01%` or `−<0.01%`; exact zero remains `0.00%`. Lifetime-PD input controls also keep small entries visible after editing and applying, using significant-digit formatting. Calculations and exports keep their existing precision.
 
 Then explore the one-click examples:
 

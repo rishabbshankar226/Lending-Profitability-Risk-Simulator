@@ -502,6 +502,36 @@ def empty_dataset_source(destination):
     return dataset.manifest()
 
 
+def tiny_pd_inputs(r):
+    p = r.page
+    r.expand('Credit assumptions')
+    for band in ('Low', 'Medium', 'High'):
+        field = p.get_by_role('spinbutton', name=f'{band}-band lifetime PD (%)', exact=True)
+        field.fill('0.0001')
+        field.press('Enter')
+        expect(p.get_by_text(re.compile(f'Draft effective lifetime PD: .*{band} <0.01%'))).to_be_visible()
+        r.ready()
+        expect(field).to_have_value('0.0001')
+    r.check('Small nonzero PD inputs stay visible after draft rerenders')
+    p.get_by_role('button', name='Run scenario', exact=True).click()
+    expect(p.get_by_text('Net principal loss: <0.01% · Cap: 5.00%.', exact=True)).to_be_visible()
+    r.ready()
+    for band in ('Low', 'Medium', 'High'):
+        expect(p.get_by_role('spinbutton', name=f'{band}-band lifetime PD (%)', exact=True)).to_have_value('0.0001')
+    r.capture('applied')
+    r.check('Applied small PDs retain their displayed values and nonzero loss label')
+    for band in ('Low', 'Medium', 'High'):
+        field = p.get_by_role('spinbutton', name=f'{band}-band lifetime PD (%)', exact=True)
+        field.fill('0')
+        field.press('Enter')
+        expect(p.get_by_text(re.compile(f'Draft effective lifetime PD: .*{band} 0.00%'))).to_be_visible()
+        r.ready()
+        expect(field).to_have_value('0')
+    p.get_by_role('button', name='Run scenario', exact=True).click()
+    expect(p.get_by_text('Net principal loss: 0.00% · Cap: 5.00%.', exact=True)).to_be_visible()
+    r.check('Exact zero remains distinct in both PD inputs and applied loss')
+
+
 def keyboard(r):
     p = r.page
     order = []
@@ -564,6 +594,7 @@ def main():
                 ("phone-390", (390, 844), responsive, {"is_mobile": True, "has_touch": True}),
                 ("reflow-320", (320, 800), responsive, {"is_mobile": True, "has_touch": True}),
                 ("keyboard", (1280, 800), keyboard, {"reduced_motion": "reduce"}),
+                ("tiny-pd-inputs", (1280, 900), tiny_pd_inputs, {}),
                 ("download-switch", (1440, 900), download_switch, {}),
                 ("empty-portfolio", (1440, 900), empty_portfolio, {}),
                 ("download-retry", (1440, 900), download_retry, {}),
@@ -607,7 +638,7 @@ def main():
             browser.close()
     failures = sum(case.get("status") != "passed" for case in report["cases"])
     print(f"Browser acceptance: {len(report['cases']) - failures} passed, {failures} failed. Evidence: {output}", flush=True)
-    if failures or len(report["cases"]) != 9:
+    if failures or len(report["cases"]) != 10:
         raise SystemExit(1)
 
 
