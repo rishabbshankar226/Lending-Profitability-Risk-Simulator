@@ -21,7 +21,12 @@ def money(value: Decimal | float | None) -> str:
 
 
 def percent(value: Decimal | float | None) -> str:
-    return 'Unavailable' if _missing(value) else f'{0 if value == 0 else value:.2%}'
+    if _missing(value):
+        return 'Unavailable'
+    magnitude = value.copy_abs() if isinstance(value, Decimal) else abs(value)
+    if 0 < magnitude < Decimal('.0001'):
+        return '−<0.01%' if value < 0 else '<0.01%'
+    return f'{0 if value == 0 else value:.2%}'
 
 
 def points(value: Decimal | None) -> str:
