@@ -520,6 +520,23 @@ def tiny_pd_inputs(r):
         expect(p.get_by_role('spinbutton', name=f'{band}-band lifetime PD (%)', exact=True)).to_have_value('0.0001')
     r.capture('applied')
     r.check('Applied small PDs retain their displayed values and nonzero loss label')
+    p.get_by_role('button', name='Export', exact=True).click()
+    with p.expect_download() as request:
+        p.get_by_role('button', name='Decision brief', exact=True).click()
+    download = request.value
+    assert download.failure() is None
+    path = r.output / download.suggested_filename
+    download.save_as(path)
+    text = path.read_text()
+    rows = [line for line in text.splitlines()
+            if any(line.startswith(f'| {policy} |') for policy in ('Conservative', 'Balanced', 'Aggressive'))]
+    assert len(rows) == 3 and all(line.split('|')[4].strip() == '<0.01%' for line in rows)
+    manifest = json.loads(text.split('```json\n', 1)[1].split('```', 1)[0])
+    assert all(manifest['assumptions'][field] == '0.000001'
+               for field in ('pd_low', 'pd_medium', 'pd_high'))
+    r.check('Actual decision-brief download retains tiny losses and exact applied PD inputs',
+            {'file': path.name, 'run_id': manifest['run_id']})
+    p.keyboard.press('Escape')
     for band in ('Low', 'Medium', 'High'):
         field = p.get_by_role('spinbutton', name=f'{band}-band lifetime PD (%)', exact=True)
         field.fill('0')

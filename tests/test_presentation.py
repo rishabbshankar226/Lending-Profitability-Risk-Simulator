@@ -9,7 +9,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 import pytest
 
-from lending_simulator.data import generate_dataset, load_dataset
+from lending_simulator.data import Dataset, generate_dataset, load_dataset
 from lending_simulator.decisions import compare_policies
 from lending_simulator.presentation import cohort_heatmap, csv_package, workbook_payload, monthly_frame, assumption_register
 from lending_simulator.exports import scenario_workbook
@@ -78,6 +78,34 @@ def test_brief_rejects_stale_selected_results_and_mixed_comparison(brief_dataset
     selected, results = (base[1], capital) if mismatch == "selected" else (base[0], (base[0], capital[1], base[2]))
     with pytest.raises(ValueError):
         decision_brief(selected, results)
+
+
+@pytest.mark.parametrize('rate, label', [(D('.000001'), '<0.01%'), (D(0), '0.00%')])
+def test_brief_distinguishes_small_nonzero_rates_and_losses_from_zero(rate, label):
+    dataset = generate_dataset(count=100)
+    assumptions = replace(Assumptions(), funding_rate=rate, loss_cap=rate,
+                          pd_low=rate, pd_medium=rate, pd_high=rate)
+    results = compare_policies(dataset, assumptions)
+    assert all(result.checks.passed for result in results)
+    text = decision_brief(results[0], results)
+    assert f'Funding rate: **{label}**' in text
+    assert f'Net principal loss cap: **{label}**' in text
+    rows = [line for line in text.splitlines()
+            if any(line.startswith(f'| {policy} |') for policy in ('Conservative', 'Balanced', 'Aggressive'))]
+    assert len(rows) == 3
+    assert all(line.split('|')[4].strip() == label for line in rows)
+    manifest = json.loads(text.split('```json\n', 1)[1].split('```', 1)[0])
+    assert manifest['assumptions'] == assumptions.to_dict()
+    assert manifest['run_id'] == results[0].run_id
+
+
+def test_brief_keeps_undefined_loss_distinct_from_zero_for_an_empty_dataset():
+    results = compare_policies(Dataset((), 2262026), Assumptions())
+    text = decision_brief(results[0], results)
+    rows = [line for line in text.splitlines()
+            if any(line.startswith(f'| {policy} |') for policy in ('Conservative', 'Balanced', 'Aggressive'))]
+    assert len(rows) == 3
+    assert all(line.split('|')[4].strip() == 'n.a.' for line in rows)
 
 
 def test_csv_package_has_manifest_units_exact_values_and_matching_run():
