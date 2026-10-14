@@ -86,11 +86,25 @@ def save_dataset(dataset: Dataset, path: Path) -> None:
 
 def load_dataset(path: Path, seed: int = DEFAULT_SEED) -> Dataset:
     with path.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        if tuple(reader.fieldnames or ()) != CSV_FIELDS:
-            raise ValueError(f"CSV must have exactly these fields: {CSV_FIELDS}")
+        reader = csv.reader(f, strict=True)
+        rows = []
         try:
-            rows = tuple(Application(r["application_id"], int(r["month"]), r["risk_band"], int(r["principal_cents"])) for r in reader)
-        except (TypeError, KeyError, ValueError) as e:
-            raise ValueError("CSV contains missing or invalid application fields.") from e
-    return Dataset(rows, seed)
+            if tuple(next(reader, ())) != CSV_FIELDS:
+                raise ValueError(f"CSV must have exactly these fields: {CSV_FIELDS}")
+            for row in reader:
+                if not row:
+                    continue
+                if len(row) != len(CSV_FIELDS):
+                    raise ValueError(
+                        f"CSV row {reader.line_num} must have exactly {len(CSV_FIELDS)} fields."
+                    )
+                try:
+                    application_id, month, risk_band, principal_cents = row
+                    rows.append(Application(application_id, int(month), risk_band, int(principal_cents)))
+                except ValueError as exc:
+                    raise ValueError(
+                        f"CSV row {reader.line_num} contains invalid application fields."
+                    ) from exc
+        except csv.Error as exc:
+            raise ValueError(f"CSV row {reader.line_num} has malformed quoting.") from exc
+    return Dataset(tuple(rows), seed)

@@ -28,6 +28,41 @@ def test_csv_roundtrip_preserves_content_hash_and_population(tmp_path):
     assert reloaded == dataset
 
 
+@pytest.mark.parametrize('row', [
+    'syn-a,0,low,10000,ignored\n',
+    'syn-a,0,low,10000,\n',
+    'syn-a,0,low,"10000\n',
+    'syn-a,0,low\n',
+])
+def test_csv_rejects_extra_missing_or_malformed_fields(tmp_path, row):
+    path = tmp_path / 'applications.csv'
+    path.write_text('application_id,month,risk_band,principal_cents\n' + row)
+    with pytest.raises(ValueError, match='CSV'):
+        load_dataset(path)
+
+
+def test_csv_malformed_header_is_a_validation_error(tmp_path):
+    path = tmp_path / 'applications.csv'
+    path.write_text('application_id,month,risk_band,"principal_cents\n')
+    with pytest.raises(ValueError, match='CSV'):
+        load_dataset(path)
+
+
+def test_csv_accepts_quoted_ids_blank_lines_and_windows_line_endings(tmp_path):
+    path = tmp_path / 'applications.csv'
+    path.write_bytes(b'application_id,month,risk_band,principal_cents\r\n'
+                     b'"syn,a",0,low,10000\r\n\r\nsyn-b,1,medium,20000\r\n')
+    expected = Dataset((Application('syn,a', 0, 'low', 10000),
+                        Application('syn-b', 1, 'medium', 20000)), 1)
+    assert load_dataset(path, seed=1) == expected
+
+
+def test_csv_header_only_retains_a_valid_empty_dataset(tmp_path):
+    path = tmp_path / 'applications.csv'
+    path.write_text('application_id,month,risk_band,principal_cents\n')
+    assert load_dataset(path, seed=1) == Dataset((), 1)
+
+
 @pytest.mark.parametrize("bad", [
     Application("a", 0, "low", 0), Application("a", 24, "low", 10000),
     Application("a", 0, "unknown", 10000), Application("", 0, "low", 10000),
