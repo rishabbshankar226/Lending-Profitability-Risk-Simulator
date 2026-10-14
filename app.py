@@ -223,9 +223,9 @@ with st.sidebar:
     credit_editor = st.expander("Credit assumptions", expanded=s.get("credit_editor", False),
                                 key="credit_editor")
     with credit_editor:
-        st.number_input("Low-band lifetime PD (%)", step=1.0, key="low_percent", on_change=sync_draft)
-        st.number_input("Medium-band lifetime PD (%)", step=1.0, key="medium_percent", on_change=sync_draft)
-        st.number_input("High-band lifetime PD (%)", step=1.0, key="high_percent", on_change=sync_draft)
+        st.number_input("Low-band lifetime PD (%)", step=1.0, format="%g", key="low_percent", on_change=sync_draft)
+        st.number_input("Medium-band lifetime PD (%)", step=1.0, format="%g", key="medium_percent", on_change=sync_draft)
+        st.number_input("High-band lifetime PD (%)", step=1.0, format="%g", key="high_percent", on_change=sync_draft)
         st.number_input("Recovery of charged-off principal (%)", step=5.0, key="recovery_percent", on_change=sync_draft)
         st.number_input("Recovery lag (months)", step=1, key="lag", on_change=sync_draft)
         try:

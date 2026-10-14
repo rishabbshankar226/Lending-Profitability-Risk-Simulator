@@ -49,6 +49,8 @@ python -m scripts.generate_dataset
 
 The CLI produces three scenario workbooks, exact-value CSV packages, comparison metadata, and a workbook specification. Regeneration reproduces the committed application CSV and content hash.
 
+Application CSV records must contain exactly four fields in the declared order: `application_id`, `month`, `risk_band`, `principal_cents`. Extra cells, missing cells, and malformed quoting produce a validation error before dashboard calculations or CLI outputs. Quoted IDs, blank lines, Windows line endings, and a header-only empty dataset remain supported.
+
 The server test starts Streamlit on a temporary local port, checks HTTP health and the frontend document, then stops it. This verifies startup; it does not inspect browser rendering or interactions.
 
 Run the separate real-browser suite with:
@@ -73,6 +75,8 @@ python -m lending_simulator.cli --assumptions path/to/manifest.json --output art
 ## Explore the dashboard
 
 Start with the decision summary and three primary metrics. **Recommended policy** compares all three policies; **Viewed policy** immediately selects the applied portfolio used by the metrics, charts and exports. The summary shows full-runoff operating profit, the cash cushion or shortfall relative to the floor, and credit-loss headroom or excess in percentage points. Actual minimum cash, loss ratio and both limits remain visible. **Applied inputs** in the toolbar retains the last successful run while you edit the sidebar.
+
+Dashboard and decision-brief percentage labels below 0.01% retain their nonzero sign as `<0.01%` or `−<0.01%`; exact zero remains `0.00%`. Lifetime-PD input controls also keep small entries visible after editing and applying, using significant-digit formatting. Calculations and exports keep their existing precision.
 
 Then explore the one-click examples:
 
@@ -123,7 +127,7 @@ Finance uses 34-digit Decimal arithmetic with a $1e−16 internal reconciliation
 - [Live browser results and screenshots](docs/browser-validation.md)
 - [Browser and release checklist](docs/release-checklist.md)
 
-All 118 automated model, application-state, export, and HTTP startup checks pass. Workbench coverage includes draft preservation/restoration, immediate policy selection, hidden-view navigation, immutable baseline comparison, exact stress staging/markers, undefined values and deferred format generation. The financial engine, model version and example run identities are unchanged; three saved decision briefs match exact regeneration. [Earlier operation measurements](docs/workbench-performance.json), pinned before the later readability changes, cover local server code and AppTest; they do not measure browser or hosting latency.
+All 144 automated model, application-state, export, and HTTP startup checks pass. Workbench coverage includes draft preservation/restoration, immediate policy selection, hidden-view navigation, immutable baseline comparison, exact stress staging/markers, undefined values and deferred format generation. CSV regressions cover row width, malformed quoting, CLI output preservation, and dashboard startup failure. The financial engine, model version and example run identities are unchanged; three saved decision briefs match exact regeneration. [Earlier operation measurements](docs/workbench-performance.json), pinned before the later readability changes, cover local server code and AppTest; they do not measure browser or hosting latency.
 
 The separate Chromium workflow passed 14 real-browser journeys (94 checks) at 1440, 1280, 390 and 320 CSS-pixel widths, plus two captures of the exact pre-redesign base. It checks rendering/reflow, keyboard/focus, WebSockets, actual exports, captured-file identity, browser cancellation/retry and an empty input source. Two controlled export cases prove selection during held server generation and recovery after an uncached builder failure. Three further journeys verify exposed native control names/main headings, expanded-view/input/error HTML readability, reference SQL/manifest contents and actual 200%/400% Chrome zoom. The 27 saved images are raw browser captures. [Browser evidence and screenshots](docs/workbench-browser-validation.md) distinguish these results from physical devices, full accessibility and hosting behavior still awaiting review.
 

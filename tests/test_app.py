@@ -389,6 +389,18 @@ def test_missing_dataset_reports_startup_error_without_an_exception(isolated_pro
     assert not page.metric
 
 
+def test_csv_extra_cell_reports_startup_error_before_metrics_or_exports(isolated_project):
+    path = isolated_project.parent / 'data' / 'applications.csv'
+    lines = path.read_text().splitlines()
+    lines[1] += ',unexpected'
+    path.write_text('\n'.join(lines) + '\n')
+    page = AppTest.from_file(isolated_project, default_timeout=20).run()
+    assert not page.exception
+    assert any('Base dataset could not be loaded' in error.value for error in page.error)
+    assert not page.metric
+    assert not page.button
+
+
 @pytest.mark.parametrize("content", ["{}", "[]"])
 def test_invalid_manifest_reports_startup_error_without_an_exception(isolated_project, content):
     (isolated_project.parent / "data" / "manifest.json").write_text(content)

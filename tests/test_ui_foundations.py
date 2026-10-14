@@ -76,6 +76,19 @@ def test_rates_and_percentage_point_changes_have_distinct_units():
     assert points(None) == 'Unavailable'
 
 
+@pytest.mark.parametrize('value, expected', [
+    (D('.000001'), '<0.01%'), (D('-.000001'), '−<0.01%'),
+    (D('1e-400'), '<0.01%'),
+    (D('.0000999999999999999999999999999999999'), '<0.01%'),
+    (0.000001, '<0.01%'), (-0.000001, '−<0.01%'),
+    (D('.0001'), '0.01%'), (D('-.0001'), '-0.01%'),
+    (0.0001, '0.01%'), (-0.0001, '-0.01%'),
+    (D(0), '0.00%'), (D('-0'), '0.00%'), (-0.0, '0.00%'),
+])
+def test_percent_distinguishes_small_nonzero_rates_from_zero(value, expected):
+    assert percent(value) == expected
+
+
 def test_profit_bridge_reconciles_without_principal_or_double_counted_recoveries(result_bundle):
     result = result_bundle[1]
     bridge = profit_bridge(result)

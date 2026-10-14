@@ -3,6 +3,7 @@
 from decimal import Decimal, localcontext
 from math import isnan
 
+from lending_simulator.formatting import percent as percent
 from lending_simulator.ui.state import FIELDS
 
 
@@ -18,10 +19,6 @@ def money(value: Decimal | float | None) -> str:
     if 0 < abs(value) < 1:
         return '(<$1)' if value < 0 else '<$1'
     return f'(${abs(value):,.0f})' if value < 0 else f'${value:,.0f}'
-
-
-def percent(value: Decimal | float | None) -> str:
-    return 'Unavailable' if _missing(value) else f'{0 if value == 0 else value:.2%}'
 
 
 def points(value: Decimal | None) -> str:

@@ -13,6 +13,7 @@ import pandas as pd
 
 from lending_simulator.data import Dataset
 from lending_simulator.decisions import evaluate_policy, select_strategy
+from lending_simulator.formatting import percent
 from lending_simulator.types import Assumptions, ModelResult, MonthlyResult, CohortMonth, Summary
 
 COUNT_FIELDS = {"expected_active", "expected_defaults", "funded_loans", "expected_applications"}
@@ -84,8 +85,8 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
         f"including {manifest['operating_horizon_months']} months of originations and complete repayment/recovery runoff.", "",
         "## Applied assumptions", "",
         f"Starting equity: **USD {amount(a.initial_cash)}**. Facility limit: **USD {amount(a.facility_limit)}**. "
-        f"Funding rate: **{a.funding_rate:.2%}** annually. Lifetime default stress: **{a.default_stress.normalize():f}×**.", "",
-        f"Net principal loss cap: **{a.loss_cap:.2%}**. Month-end cash floor: **USD {amount(a.cash_floor)}**.", "",
+        f"Funding rate: **{percent(a.funding_rate)}** annually. Lifetime default stress: **{a.default_stress.normalize():f}×**.", "",
+        f"Net principal loss cap: **{percent(a.loss_cap)}**. Month-end cash floor: **USD {amount(a.cash_floor)}**.", "",
         "## Policy tradeoffs", "",
         "Amounts are USD, rounded to whole dollars; parentheses denote negative values. Operating profit and net loss cover complete runoff.", "",
         "| Policy | Funded principal | Operating profit | Net principal loss | Minimum cash | Extra equity for cash floor | Limits |",
@@ -93,7 +94,7 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
     ]
     for r in results:
         s, limits = r.summary, evaluate_policy(r)
-        loss = "n.a." if s.loss_ratio is None else f"{s.loss_ratio:.2%}"
+        loss = "n.a." if s.loss_ratio is None else percent(s.loss_ratio)
         reason = "; ".join(limits.reasons) or "Both limits met"
         lines.append(f"| {r.policy.title()} | {amount(s.funded_principal)} | {amount(s.operating_result)} | "
                      f"{loss} | {amount(s.minimum_cash)} | {amount(s.additional_equity_required)} | {reason} |")
