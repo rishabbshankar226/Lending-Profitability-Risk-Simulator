@@ -12,7 +12,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1", "openpyxl==3.1.5"]
+dev = [
+  "pytest==9.1.1", "openpyxl==3.1.5", "mypy==2.4.0", "ruff==0.17.0",
+  "pandas-stubs==2.2.3.250527", "plotly-stubs==0.1.4"
+]
 
 [tool.setuptools]
 packages = ["lending_simulator", "lending_simulator.ui", "lending_simulator.sample_data"]
@@ -39,4 +42,6 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+disallow_any_explicit = true
 files = ["lending_simulator", "app.py"]
+mypy_path = "typings"

@@ -1,12 +1,13 @@
 """Policy eligibility, honest recommendations, and scenario comparison."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from lending_simulator.analytics import aggregate_for_model
 from lending_simulator.data import Dataset
 from lending_simulator.model import run_model
-from lending_simulator.types import POLICIES, Assumptions, ModelResult
+from lending_simulator.types import POLICIES, Assumptions, ModelResult, StressPoint
 
 
 @dataclass(frozen=True)
@@ -72,10 +73,10 @@ def select_strategy(results: tuple[ModelResult, ...]) -> Decision:
 
 
 def sensitivity(dataset: Dataset, assumptions: Assumptions, policy: str,
-                stresses=(Decimal(".5"), Decimal(1), Decimal("1.5"), Decimal(2), Decimal(3)),
-                funding_rates=(Decimal(".04"), Decimal(".08"), Decimal(".12"), Decimal(".16"))) -> tuple[dict, ...]:
+                stresses: Sequence[Decimal] = (Decimal(".5"), Decimal(1), Decimal("1.5"), Decimal(2), Decimal(3)),
+                funding_rates: Sequence[Decimal] = (Decimal(".04"), Decimal(".08"), Decimal(".12"), Decimal(".16"))) -> tuple[StressPoint, ...]:
     cohorts, denominator = aggregate_for_model(dataset, policy, assumptions.demand_growth)
-    points = []
+    points: list[StressPoint] = []
     for stress in stresses:
         for funding_rate in funding_rates:
             inputs = replace(assumptions, default_stress=stress, funding_rate=funding_rate)

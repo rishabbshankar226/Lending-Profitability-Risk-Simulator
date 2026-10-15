@@ -150,6 +150,24 @@ def test_report_labels_do_not_propagate_infinity(value):
     assert points(value) == "Unavailable"
 
 
+@pytest.mark.parametrize("sign,expected", [("", "<$1"), ("-", "(<$1)")])
+def test_money_labels_keep_exact_values_below_reporting_threshold(sign, expected):
+    assert money(D(sign + "0." + "9" * 110)) == expected
+
+
+@pytest.mark.parametrize("sign,expected", [("", "<0.01 pp"), ("-", "−<0.01 pp")])
+def test_point_labels_keep_exact_values_below_reporting_threshold(sign, expected):
+    assert points(D(sign + "0.00" + "9" * 110)) == expected
+
+
+@pytest.mark.parametrize("sign", ["", "-"])
+def test_money_labels_preserve_large_integer_dollars(sign):
+    digits = "1" + "0" * 95 + "1"
+    amount = f"{int(digits):,}"
+    expected = f"(${amount})" if sign else f"${amount}"
+    assert money(D(sign + digits)) == expected
+
+
 @pytest.mark.parametrize("payload", [
     '{"initial_cash": 1, "initial_cash": 2}',
     '{"initial_cash": NaN}', '{"initial_cash": Infinity}',

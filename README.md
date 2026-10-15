@@ -9,11 +9,11 @@ The application uses 10,000 fictional applications and illustrative risk/cost
 assumptions. It has no borrower scoring or historical calibration. Results are
 conditional projections, not evidence of actual lender performance.
 
-The current audit checkpoint fixes numerical and input-boundary defects. The
-strict-typing release gate remains open: see the
-[concrete development-tooling approval](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
-It is not a completed production release. No new dependency has been added under
-that proposal, and no deployment or main-branch merge is included.
+The audit repairs numerical, input-boundary and installed-package defects.
+Full strict typing, linting and the 200-test suite pass locally; these checks
+are now required in CI. The [audit ledger](docs/AUDIT_2026-10-15.md) records
+revision-specific CI/browser results and the
+[approved development-tooling record](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
 
 ## Architecture
 
@@ -27,6 +27,7 @@ that proposal, and no deployment or main-branch merge is included.
 | `json_input.py`, `cli.py` | Bounded exact configuration intake and reproducible local scenario exports |
 | `presentation.py`, `exports.py` | Report adapters, exact CSV packages and workbook snapshots/benchmarks |
 | `ui/`, `app.py` | Draft/apply state, isolated visitor sessions, charts and deferred exports |
+| `typings/` | Source-checked declarations for consumed XlsxWriter APIs and documented dynamic boundaries |
 
 The synthetic generator uses a fresh `random.Random(seed)` instance. Changing
 scenarios does not resample outcomes or mutate global random state. This model
@@ -104,8 +105,9 @@ explicit successful Run. Invalid drafts retain the previous accepted result.
 
 Runtime-only installation uses `requirements.txt`. Browser checks use
 `requirements-browser.txt`; all three have exact resolved constraints. The
-existing build dependency is pinned in `pyproject.toml`. Development typing
-packages in the approval document are proposed only.
+existing build dependency is pinned in `pyproject.toml`. Approved development
+tools are included in the development/browser environments. Runtime-only
+installations do not require the checkers or typing stubs.
 
 ## CLI and input contracts
 
@@ -162,6 +164,8 @@ With the environment active:
 
 ```bash
 python -m pip check
+python -m ruff check lending_simulator app.py tests typings
+python -m mypy --strict lending_simulator app.py
 python -m pytest
 python -m compileall -q app.py lending_simulator
 python -m lending_simulator.cli --output artifacts/base-case
@@ -184,11 +188,12 @@ downloads, server-generation failures and native zoom. AppTest and HTTP startup
 checks do not substitute for real browser execution.
 
 [The audit ledger](docs/AUDIT_2026-10-15.md) records severity, baseline file/line
-evidence, exact remediation, executed results and open work. It distinguishes
-passed tests from the unresolved project-wide strict-mypy gate. The complete
-[tooling proposal](docs/DEVELOPMENT_TOOLING_APPROVAL.md) names exact versions,
-resolved dependencies and the user approval boundary. No check is claimed to
-pass until it has actually executed successfully.
+evidence, exact remediation and executed results. Mypy checks all application
+modules with strict mode and forbids explicit application `Any` declarations.
+[Boundary declarations](typings/README.md) document third-party typing limits
+and the runtime coverage that complements them. The
+[tooling approval record](docs/DEVELOPMENT_TOOLING_APPROVAL.md) names exact
+versions and resolved additions. No check is claimed to pass until executed.
 
 ## Model and operating governance
 

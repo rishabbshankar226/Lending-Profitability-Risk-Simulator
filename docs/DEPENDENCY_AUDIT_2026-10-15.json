@@ -1,5 +1,7 @@
 {
-  "checked_on": "2026-10-15T18:41:30.503166+00:00",
+  "checked_on": "2026-10-15T19:37:07.370454+00:00",
+  "source": "https://api.osv.dev/v1/querybatch",
+  "scope": "Exact existing runtime/browser/build pins plus the approved development additions; Python 3.12 Linux.",
   "queries": [
     {
       "package": {
@@ -7,6 +9,13 @@
         "ecosystem": "PyPI"
       },
       "version": "6.3.0"
+    },
+    {
+      "package": {
+        "name": "ast_serialize",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.13.0"
     },
     {
       "package": {
@@ -115,10 +124,31 @@
     },
     {
       "package": {
+        "name": "librt",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.16.0"
+    },
+    {
+      "package": {
         "name": "MarkupSafe",
         "ecosystem": "PyPI"
       },
       "version": "3.0.4"
+    },
+    {
+      "package": {
+        "name": "mypy",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.4.0"
+    },
+    {
+      "package": {
+        "name": "mypy_extensions",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.1.0"
     },
     {
       "package": {
@@ -157,6 +187,20 @@
     },
     {
       "package": {
+        "name": "pandas-stubs",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.2.3.250527"
+    },
+    {
+      "package": {
+        "name": "pathspec",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.1.1"
+    },
+    {
+      "package": {
         "name": "pillow",
         "ecosystem": "PyPI"
       },
@@ -175,6 +219,13 @@
         "ecosystem": "PyPI"
       },
       "version": "7.1.0"
+    },
+    {
+      "package": {
+        "name": "plotly-stubs",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.1.4"
     },
     {
       "package": {
@@ -269,6 +320,13 @@
     },
     {
       "package": {
+        "name": "ruff",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.17.0"
+    },
+    {
+      "package": {
         "name": "six",
         "ecosystem": "PyPI"
       },
@@ -294,6 +352,13 @@
         "ecosystem": "PyPI"
       },
       "version": "0.10.2"
+    },
+    {
+      "package": {
+        "name": "types-pytz",
+        "ecosystem": "PyPI"
+      },
+      "version": "2026.5.0.20261006"
     },
     {
       "package": {
@@ -403,7 +468,17 @@
       {},
       {},
       {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
       {}
     ]
-  }
+  },
+  "matched_advisories": 0
 }

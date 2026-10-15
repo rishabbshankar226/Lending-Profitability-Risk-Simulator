@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 from decimal import Decimal
+from typing import cast
 
 from lending_simulator import MODEL_VERSION
 from lending_simulator.numeric import (
@@ -65,7 +66,10 @@ def _validate_term(term: int) -> None:
         raise ValueError("Term must be a positive integer number of months.")
 
 
-def _validate_inputs(cohorts, assumptions, policy, expected_applications):
+def _validate_inputs(
+    cohorts: tuple[CohortInput, ...], assumptions: Assumptions,
+    policy: str, expected_applications: Decimal,
+) -> None:
     assumptions.validate()
     if policy not in POLICIES:
         raise ValueError(f"Unknown policy: {policy}")
@@ -100,7 +104,7 @@ def _cohort_schedule(c: CohortInput, a: Assumptions) -> tuple[CohortMonth, ...]:
     survival = D(1)
     # Contractual balance of the entire original cohort in the absence of default.
     contractual_balance = c.principal
-    recoveries_due = {}
+    recoveries_due: dict[int, Decimal] = {}
     rows = [CohortMonth(
         c.origination_month, c.risk_band, c.origination_month, 0,
         originations=c.principal, ending_principal=c.principal,
@@ -155,12 +159,12 @@ def run_model(
         horizon = ORIGINATION_MONTHS + a.term + a.recovery_lag
         cohort_rows = tuple(row for c in sorted(cohorts, key=lambda c: (c.origination_month, BANDS.index(c.risk_band)))
                             for row in _cohort_schedule(c, a))
-        by_month = [[] for _ in range(horizon)]
-        for row in cohort_rows:
-            by_month[row.month].append(row)
+        by_month: list[list[CohortMonth]] = [[] for _ in range(horizon)]
+        for cohort_row in cohort_rows:
+            by_month[cohort_row.month].append(cohort_row)
         carry_principal = carry_debt = cumulative_result = ZERO
         cash = a.initial_cash
-        monthly = []
+        monthly: list[MonthlyResult] = []
         residuals = {name: ZERO for name in ("loan", "debt", "cash", "equity", "cohort")}
         exposure_limits_ok = True
         aggregate_fields = (
@@ -209,8 +213,8 @@ def run_model(
             exposure_limits_ok &= 0 <= debt <= a.facility_limit and debt <= a.advance_rate * row.ending_principal + TOLERANCE
             cash, carry_principal, carry_debt = closing_cash, row.ending_principal, debt
 
-        def total(name):
-            return sum((getattr(row, name) for row in monthly), ZERO)
+        def total(name: str) -> Decimal:
+            return sum((cast(Decimal, getattr(row, name)) for row in monthly), ZERO)
 
         funded = total("funded_loans")
         principal = total("originations")

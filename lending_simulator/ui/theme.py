@@ -38,5 +38,5 @@ STYLE = """
 """
 
 
-def apply_styles():
+def apply_styles() -> None:
     st.html(STYLE)

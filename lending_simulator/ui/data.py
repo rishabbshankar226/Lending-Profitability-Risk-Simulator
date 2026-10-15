@@ -1,5 +1,6 @@
 """Exact comparison adapters and safe numeric data for the visual layer."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
@@ -8,7 +9,7 @@ import pandas as pd
 from lending_simulator import MODEL_VERSION
 from lending_simulator.decisions import select_strategy
 from lending_simulator.numeric import numeric_context
-from lending_simulator.types import ModelResult
+from lending_simulator.types import Assumptions, ModelResult, StressCase
 
 D = Decimal
 
@@ -22,7 +23,7 @@ class ScenarioSnapshot:
     origination_months: int
 
     @classmethod
-    def capture(cls, results: tuple[ModelResult, ...]):
+    def capture(cls, results: tuple[ModelResult, ...]) -> "ScenarioSnapshot":
         select_strategy(results)  # Reject mixed or duplicated comparison inputs.
         manifest = results[0].manifest()
         return cls(results, MODEL_VERSION, manifest['currency'], manifest['start_month'],
@@ -90,13 +91,13 @@ def profit_bridge(result: ModelResult) -> tuple[tuple[str, Decimal], ...]:
     return rows + (('Operating profit', s.operating_result),)
 
 
-def stress_frame(points: tuple[dict, ...]) -> pd.DataFrame:
+def stress_frame(points: tuple[Mapping[str, object], ...]) -> pd.DataFrame:
     rows = []
     numeric = ('default_stress', 'funding_rate', 'operating_result', 'contribution',
                'minimum_cash', 'loss_ratio', 'additional_equity_required')
     for point in points:
         row = dict(point)
-        profit = None
+        profit = D(0)
         for field in numeric:
             raw = row[field]
             if field == 'loss_ratio' and (raw is None or raw == 'None'):
@@ -116,7 +117,7 @@ def stress_frame(points: tuple[dict, ...]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def applied_case_index(points: tuple[dict, ...], assumptions) -> int | None:
+def applied_case_index(points: tuple[StressCase, ...], assumptions: Assumptions) -> int | None:
     """Match the captured Decimal pair before any chart float conversion."""
     return next((index for index, point in enumerate(points)
         if D(point['default_stress']) == assumptions.default_stress

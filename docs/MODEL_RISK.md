@@ -54,7 +54,11 @@ cases in CI. A subsequent installed-wheel regression adds packaging coverage;
 the full follow-up passes 194 tests both locally and in CI. The verified
 follow-up CI also passes 15 browser journeys and two historical-reference
 captures. The [audit ledger](AUDIT_2026-10-15.md) records exact commands,
-revisions and evidence. These results do not resolve the strict-typing gate.
+revisions and evidence. After the explicit tooling approval, the full strict
+check passes all 22 application files and all 200 tests pass locally, including
+six new reporting-boundary regressions. CI now
+requires linting, dependency consistency and full strict typing before tests.
+The ledger distinguishes earlier CI from verification of these final repairs.
 
 These tests establish supported implementation behavior. They do not establish
 PD/recovery accuracy, sensitivity to real population shifts, actual liquidity,
@@ -82,5 +86,5 @@ Model version 0.1.1 changes numerical semantics and run IDs. Old exports are not
 rewritten; exact old-run reproduction requires the old release. Current CLI
 runs evaluate supplied inputs with the current model version and dependencies.
 Retain source revision, dependency constraints and inputs with any institutional
-review. The full strict-typing release gate remains open under the user's
-[new-dependency approval condition](DEVELOPMENT_TOOLING_APPROVAL.md).
+review. The [development-tooling approval record](DEVELOPMENT_TOOLING_APPROVAL.md)
+documents the authorized additions and completed local strict-typing repairs.

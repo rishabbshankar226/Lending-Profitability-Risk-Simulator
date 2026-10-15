@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
@@ -15,7 +16,7 @@ from lending_simulator.presentation import csv_package
 from lending_simulator.types import Assumptions
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     default_dataset = Path(__file__).resolve().parent / "sample_data" / "applications.csv"
     if not default_dataset.is_file():
@@ -27,7 +28,10 @@ def main(argv=None):
     try:
         dataset = load_dataset(args.dataset)
         saved = load_assumptions_document(args.assumptions) if args.assumptions else {}
-        assumptions = Assumptions.from_dict(saved.get("assumptions", saved))
+        supplied = saved.get("assumptions", saved)
+        if not isinstance(supplied, dict):
+            raise ValueError("Assumptions must be an object with string keys.")
+        assumptions = Assumptions.from_dict(supplied)
         if "dataset_hash" in saved and saved["dataset_hash"] != dataset.dataset_hash:
             raise ValueError("The manifest's dataset hash does not match the supplied CSV.")
         results = compare_policies(dataset, assumptions)

@@ -1,9 +1,10 @@
 """Only the selected analytical view is built on each rerun."""
 
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from decimal import Decimal as D
+from typing import TypedDict, cast
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -43,8 +44,21 @@ from lending_simulator.ui.formatting import (
     percent,
     points,
 )
-from lending_simulator.ui.state import FIELDS, DraftChange, draft_changes
+from lending_simulator.ui.state import FIELDS, DraftChange, StressRun, draft_changes
 from lending_simulator.ui.theme import BAND_COLORS, POLICY_COLORS
+
+
+class ViewActions(TypedDict):
+    view: Callable[[str], None]
+    navigate: Callable[[str], None]
+    credit: Callable[[], None]
+    cohort: Callable[[], None]
+    pin: Callable[[], None]
+    clear_baseline: Callable[[], None]
+    stress: Callable[[], None]
+    stress_case: Callable[[], None]
+    stress_metric: Callable[[], None]
+    stage: Callable[[], None]
 
 
 @dataclass(frozen=True)
@@ -53,17 +67,17 @@ class ViewContext:
     results: tuple[ModelResult, ...]
     dataset: Dataset
     decision: Decision
-    actions: Mapping[str, Callable]
+    actions: ViewActions
 
 
-def secondary_metrics(items):
+def secondary_metrics(items: Sequence[tuple[str, str]]) -> None:
     for col, (label, value) in zip(st.columns(len(items)), items, strict=True):
         with col:
             caption(label)
             st.markdown(f'**{value}**'.replace('$', r'\$'))
 
 
-def render_overview(ctx):
+def render_overview(ctx: ViewContext) -> None:
     r, s = ctx.selected, ctx.selected.summary
     st.header('Overview')
     secondary_metrics((('Funded principal', money(s.funded_principal)),
@@ -85,8 +99,8 @@ def render_overview(ctx):
         fig = charts.timeline(r, [('cumulative_operating_result', 'Cumulative operating profit')])
         origins = r.manifest()['operating_horizon_months']
         if len(r.monthly) > origins:
-            fig.add_shape(type='rect', x0=charts.dates(r)[origins], x1=charts.dates(r)[-1],
-                y0=0, y1=1, yref='paper', fillcolor='#EDF2F6', opacity=.6, line_width=0, layer='below')
+            fig.add_shape(dict(type='rect', x0=charts.dates(r)[origins], x1=charts.dates(r)[-1],
+                y0=0, y1=1, yref='paper', fillcolor='#EDF2F6', opacity=.6, line_width=0, layer='below'))
             fig.add_annotation(x=charts.dates(r)[origins], y=1, yref='paper', text='Runoff', showarrow=False, xanchor='left')
         charts.show(fig, f'profit-{r.run_id}')
     with cash_col:
@@ -102,14 +116,14 @@ def render_overview(ctx):
         st.dataframe(monthly_frame(r)[['period','operating_result','cumulative_operating_result','ending_cash']], hide_index=True, width='stretch')
 
 
-def baseline_panel(ctx):
+def baseline_panel(ctx: ViewContext) -> None:
     with st.expander('Compare with a pinned scenario'):
         caption('Pin the applied scenario, then change assumptions. One baseline is held for this session; drafts and refreshes are not saved scenarios.')
         with st.container(horizontal=True, wrap=True):
             st.button('Pin applied scenario', key='pin_baseline', on_click=ctx.actions['pin'])
             if 'baseline' in st.session_state:
                 st.button('Clear baseline', key='clear_baseline', on_click=ctx.actions['clear_baseline'])
-        old = st.session_state.get('baseline')
+        old = cast(ScenarioSnapshot | None, st.session_state.get('baseline'))
         if old is None:
             st.info('No baseline pinned. Pin this applied scenario to compare your next run.')
             return
@@ -148,7 +162,7 @@ def baseline_panel(ctx):
         caption('Same policy compared to itself. Parentheses / minus signs denote decreases. Higher cash and a smaller equity gap describe liquidity; starting equity has no modeled cost of equity. Multiple changed assumptions do not establish individual causal effects.')
 
 
-def render_policies(ctx):
+def render_policies(ctx: ViewContext) -> None:
     st.header('Policies')
     policy_summary(ctx.results, ctx.decision.recommended_policy, ctx.selected.policy)
     for col, r in zip(st.columns(3), ctx.results, strict=False):
@@ -176,13 +190,13 @@ def render_policies(ctx):
 
 
 @st.cache_data(max_entries=6, show_spinner=False)
-def cohort_scale(run_ids, _results):
+def cohort_scale(run_ids: tuple[str, ...], _results: tuple[ModelResult, ...]) -> float:
     values = [cohort_heatmap(r).max().max() for r in _results]
     maximum = max((value for value in values if pd.notna(value)), default=0)
     return max(.001, float(maximum))
 
 
-def render_cohorts(ctx):
+def render_cohorts(ctx: ViewContext) -> None:
     st.header('Cohorts')
     st.session_state.setdefault('cohort_cutoff', st.session_state.get('cohort_view', 'First 24 months'))
     cutoff = st.radio('Cohort cutoff', ['First 24 months', 'Complete runoff'], horizontal=True,
@@ -192,11 +206,11 @@ def render_cohorts(ctx):
     if not heatmap.notna().any().any():
         st.info('No funded cohorts under this policy. Cohort loss ratios are unavailable.')
     else:
-        fig = go.Figure(go.Heatmap(z=heatmap.values*100, x=list(heatmap.columns),
+        fig = go.Figure(go.Heatmap(dict(z=heatmap.values*100, x=list(heatmap.columns),
             y=[month_label(m) for m in heatmap.index], colorscale='Blues', zmin=0,
             zmax=cohort_scale(tuple(r.run_id for r in ctx.results), ctx.results)*100,
             colorbar={'title': 'Net loss %'}, hoverongaps=False,
-            hovertemplate='Origination: %{y}<br>Loan age: %{x} months<br>Projected net loss: %{z:.2f}%<extra></extra>'))
+            hovertemplate='Origination: %{y}<br>Loan age: %{x} months<br>Projected net loss: %{z:.2f}%<extra></extra>')))
         fig.update_xaxes(title='Loan age (months)', nticks=8)
         fig.update_yaxes(autorange='reversed', title='Origination month', nticks=12)
         charts.show(fig, f'cohorts-{ctx.selected.run_id}-{cutoff}', 480)
@@ -211,27 +225,28 @@ def render_cohorts(ctx):
             with col:
                 fig = go.Figure()
                 for band, group in curves.groupby('risk_band', sort=False):
-                    fig.add_scatter(x=group.age, y=group[field], name=band, mode='lines',
-                        line={'color': BAND_COLORS[band], 'width': 2.5,
-                                  'dash': {'Low':'solid','Medium':'dash','High':'dot'}[band]},
+                    band_name = str(band)
+                    fig.add_scatter(x=group.age, y=group[field], name=band_name, mode='lines',
+                        line={'color': BAND_COLORS[band_name], 'width': 2.5,
+                                  'dash': {'Low':'solid','Medium':'dash','High':'dot'}[band_name]},
                         hovertemplate='Age %{x} months<br>%{y:.2%}<extra>%{fullData.name}</extra>')
                 fig.update_xaxes(title='Loan age (months)', nticks=7)
                 fig.update_yaxes(title=title, tickformat='.0%', range=[0,1] if bound else None, rangemode='tozero')
                 charts.show(fig, f'band-{field}-{ctx.selected.run_id}', 320)
     with st.expander('Accessible projected cohort and risk-band values'):
         display = heatmap.copy()
-        display.index = [month_label(m) for m in display.index]
+        display.index = pd.Index([month_label(m) for m in display.index])
         st.dataframe(display, width='stretch')
         if not curves.empty:
             readable_table(curves.groupby('risk_band', sort=False).last()[['principal_repaid_ratio','net_loss_ratio']].map(percent))
             st.dataframe(curves, hide_index=True, width='stretch')
 
 
-def stress_panel(ctx):
+def stress_panel(ctx: ViewContext) -> None:
     st.subheader('Default and funding stress')
     caption('20 selected-policy cases: absolute lifetime-PD multipliers and annual funding rates. Other applied inputs stay fixed; these cases do not rank all three policies.')
     st.button('Run stress grid', key='run_stress', on_click=ctx.actions['stress'])
-    saved = st.session_state.get('stress_points')
+    saved = cast(StressRun | None, st.session_state.get('stress_points'))
     if not saved or saved['run_id'] != ctx.selected.run_id:
         st.info('Stress grid has not been run for this applied policy. Run it when you want to explore the cases.')
         return
@@ -245,29 +260,29 @@ def stress_panel(ctx):
     if grid.isna().all().all():
         st.info('Net loss is unavailable: no principal was funded. Costs, cash, and failure reasons remain available.')
     else:
-        def cell(value):
+        def cell(value: float) -> str:
             if pd.isna(value):
                 return 'Unavailable'
             if field == 'loss_ratio':
                 return f'{value:.2%}'
             return f'{"−" if value<0 else ""}${abs(value)/1000:,.0f}k' if abs(value)>=1000 else money(value)
         details = {(p['default_stress'],p['funding_rate']):p for p in frame.to_dict('records')}
-        hover = [[f'{multiple(D(str(i)))} defaults · {percent(j)} funding<br>{metric}: '+
-            (percent(grid.loc[i,j]) if field=='loss_ratio' else money(grid.loc[i,j]))+
+        hover = [[f'{multiple(D(str(i)))} defaults · {percent(float(j))} funding<br>{metric}: '+
+            (percent(cast(float, grid.loc[i,j])) if field=='loss_ratio' else money(cast(float, grid.loc[i,j])))+
             '<br>'+details[(i,j)]['profitability']+' · '+('Limits met' if details[(i,j)]['eligible'] else 'Limits failed')+
             '<br>'+details[(i,j)]['reasons'] for j in grid.columns] for i in grid.index]
-        fig = go.Figure(go.Heatmap(z=grid.values, x=[percent(j) for j in grid.columns],
-            y=[multiple(D(str(i))) for i in grid.index], text=[[cell(grid.loc[i,j]) for j in grid.columns] for i in grid.index],
+        fig = go.Figure(go.Heatmap(dict(z=grid.values, x=[percent(float(j)) for j in grid.columns],
+            y=[multiple(D(str(i))) for i in grid.index], text=[[cell(cast(float, grid.loc[i,j])) for j in grid.columns] for i in grid.index],
             texttemplate='%{text}', customdata=hover, hovertemplate='%{customdata}<extra></extra>',
             colorscale='Blues' if field=='loss_ratio' else 'Reds' if field=='additional_equity_required' else 'RdBu',
             zmid=float(ctx.selected.assumptions.cash_floor) if field=='minimum_cash' else 0 if field=='operating_result' else None,
-            colorbar={'title': 'Net loss ratio' if field=='loss_ratio' else 'USD', 'tickformat': '.0%' if field=='loss_ratio' else '~s'}))
+            colorbar={'title': 'Net loss ratio' if field=='loss_ratio' else 'USD', 'tickformat': '.0%' if field=='loss_ratio' else '~s'})))
         a = ctx.selected.assumptions
         present = applied_case_index(saved['points'], a) is not None
         if present:
-            fig.add_scatter(x=[percent(a.funding_rate)], y=[multiple(a.default_stress)], mode='markers',
+            fig.add_trace(go.Scatter(dict(x=[percent(a.funding_rate)], y=[multiple(a.default_stress)], mode='markers',
                 marker={'symbol': 'square-open','size': 35,'color': '#182C3E','line': {'width': 2}},
-                showlegend=False, hoverinfo='skip')
+                showlegend=False, hoverinfo='skip')))
         fig.update_xaxes(title='Annual funding rate', type='category')
         fig.update_yaxes(title='Lifetime PD multiplier', type='category')
         charts.show(fig, f'stress-{ctx.selected.run_id}-{field}', 380)
@@ -296,7 +311,7 @@ def stress_panel(ctx):
         st.dataframe(frame, hide_index=True, width='stretch')
 
 
-def render_funding(ctx):
+def render_funding(ctx: ViewContext) -> None:
     st.header('Funding & stress')
     s = ctx.selected.summary
     charts.show(charts.cash_chart(ctx.selected,include_debt=True),f'funding-{ctx.selected.run_id}',360)
@@ -308,7 +323,7 @@ def render_funding(ctx):
         st.dataframe(monthly_frame(ctx.selected)[['period','ending_principal','ending_debt','net_debt_draw','funding_expense','ending_cash']],hide_index=True,width='stretch')
 
 
-def render_methodology(ctx):
+def render_methodology(ctx: ViewContext) -> None:
     st.header('Methodology')
     status_chip('Financial reconciliations passed' if ctx.selected.checks.passed else 'Financial reconciliation failed', 'good' if ctx.selected.checks.passed else 'bad')
     caption('Reconciled computations do not establish borrower prediction accuracy or real underwriting performance.')
@@ -350,6 +365,6 @@ def render_methodology(ctx):
         st.code(json.dumps(ctx.selected.manifest(), indent=2), language=None, wrap_lines=True)
 
 
-def render(view,ctx):
+def render(view: str, ctx: ViewContext) -> None:
     {'Overview':render_overview,'Policies':render_policies,'Cohorts':render_cohorts,
      'Funding & stress':render_funding,'Methodology':render_methodology}[view](ctx)

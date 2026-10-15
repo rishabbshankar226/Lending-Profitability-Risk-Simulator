@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 from importlib.resources import files
 from io import BytesIO, StringIO
+from typing import TypedDict, cast
 
 import pandas as pd
 
@@ -28,6 +29,31 @@ RATIO_FIELDS = {"approval_rate", "loss_ratio"}
 INDEX_FIELDS = {"month", "age", "origination_month", "minimum_cash_month"}
 RATE_INPUTS = {"borrower_rate", "merchant_fee", "pd_low", "pd_medium", "pd_high", "recovery_rate",
                "funding_rate", "advance_rate", "demand_growth", "loss_cap"}
+
+type ExportRecord = dict[str, str | int | bool | None]
+type DisplayRecord = dict[str, str | int | float | bool | None]
+
+
+class EvidenceSource(TypedDict):
+    publisher: str
+    url: str
+    suitability: str
+
+
+class EvidenceRegister(TypedDict):
+    decision: str
+    sources: list[EvidenceSource]
+
+
+class WorkbookPayload(TypedDict):
+    selected_run_id: str
+    manifest: dict[str, object]
+    summary: ExportRecord
+    monthly: list[ExportRecord]
+    cohorts: list[ExportRecord]
+    assumptions: list[dict[str, str]]
+    comparison: list[DisplayRecord]
+    sources: EvidenceRegister
 
 
 def month_label(month: int) -> str:
@@ -78,7 +104,7 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
     decision = select_strategy(results)
     a, manifest = result.assumptions, result.manifest()
 
-    def amount(value):
+    def amount(value: Decimal) -> str:
         return f"({abs(value):,.0f})" if value < 0 else f"{value:,.0f}"
 
     recommendation = decision.recommended_policy.title() if decision.recommended_policy else "None"
@@ -133,7 +159,7 @@ def cohort_heatmap(result: ModelResult, as_of_month: int | None = None) -> pd.Da
         as_of_month = len(result.monthly) - 1
     term = result.assumptions.term + result.assumptions.recovery_lag
     frame = pd.DataFrame(float("nan"), index=range(24), columns=range(term + 1))
-    cohorts = {}
+    cohorts: dict[int, list[CohortMonth]] = {}
     for row in result.cohorts:
         key = row.origination_month
         cohorts.setdefault(key, []).append(row)
@@ -183,11 +209,11 @@ def units_for(name: str) -> str:
     return "USD, monthly flow" if name not in ("additional_equity_required",) else "USD, additional starting equity to meet cash floor"
 
 
-def _record(obj):
+def _record(obj: MonthlyResult | CohortMonth | Summary) -> ExportRecord:
     return {k: str(v) if isinstance(v, Decimal) else v for k, v in asdict(obj).items()}
 
 
-def _csv(records: list[dict], fieldnames: list[str]) -> str:
+def _csv(records: list[ExportRecord], fieldnames: list[str]) -> str:
     stream = StringIO(newline="")
     writer = csv.DictWriter(stream, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
@@ -219,11 +245,13 @@ def csv_package(result: ModelResult, dataset: Dataset) -> bytes:
     return buffer.getvalue()
 
 
-def evidence_register() -> dict:
-    return json.loads(files("lending_simulator").joinpath("evidence", "sources.json").read_text())
+def evidence_register() -> EvidenceRegister:
+    return cast(EvidenceRegister, json.loads(
+        files("lending_simulator").joinpath("evidence", "sources.json").read_text()
+    ))
 
 
-def assumption_register(assumptions: Assumptions) -> list[dict]:
+def assumption_register(assumptions: Assumptions) -> list[dict[str, str]]:
     rows = []
     timing = {
         "borrower_rate": "monthly nominal rate = annual / 12; payments start after origination",
@@ -248,10 +276,11 @@ def assumption_register(assumptions: Assumptions) -> list[dict]:
     return rows
 
 
-def workbook_payload(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> dict:
+def workbook_payload(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> WorkbookPayload:
     if result.dataset_hash != dataset.dataset_hash or result not in results:
         raise ValueError("Workbook must contain the selected scenario's results and dataset.")
     return {"selected_run_id": result.run_id, "manifest": result.manifest() | {"dataset": dataset.manifest()},
             "summary": _record(result.summary), "monthly": [_record(r) for r in result.monthly],
             "cohorts": [_record(r) for r in result.cohorts], "assumptions": assumption_register(result.assumptions),
-            "comparison": comparison_frame(results).to_dict(orient="records"), "sources": evidence_register()}
+            "comparison": cast(list[DisplayRecord], comparison_frame(results).to_dict(orient="records")),
+            "sources": evidence_register()}

@@ -27,12 +27,12 @@ class Dataset:
     version: str = DATASET_VERSION
     dataset_hash: str = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate()
         content = [(a.application_id, a.month, a.risk_band, a.principal_cents) for a in self.applications]
         object.__setattr__(self, "dataset_hash", stable_hash({"version": self.version, "rows": content}))
 
-    def validate(self):
+    def validate(self) -> None:
         if type(self.seed) is not int or not isinstance(self.applications, tuple):
             raise ValueError("Dataset requires an integer seed and an immutable tuple of applications.")
         seen = set()
@@ -49,7 +49,7 @@ class Dataset:
             if type(a.principal_cents) is not int or not 0 < a.principal_cents <= 100000000:
                 raise ValueError("Requested principal must be positive integer cents, at most $1m.")
 
-    def manifest(self):
+    def manifest(self) -> dict[str, object]:
         return {
             "dataset_version": self.version, "seed": self.seed, "dataset_hash": self.dataset_hash,
             "rows": len(self.applications), "classification": "synthetic",

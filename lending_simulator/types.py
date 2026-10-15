@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, fields, replace
 from decimal import Decimal, DecimalException
 from hashlib import sha256
+from typing import TypedDict, cast
 
 from lending_simulator import MODEL_VERSION
 from lending_simulator.numeric import numeric_context
@@ -18,6 +19,61 @@ POLICIES = {
 }
 BANDS = ("low", "medium", "high")
 ORIGINATION_MONTHS = 24
+
+
+class AssumptionOverrides(TypedDict, total=False):
+    term: int
+    recovery_lag: int
+    borrower_rate: Decimal
+    merchant_fee: Decimal
+    pd_low: Decimal
+    pd_medium: Decimal
+    pd_high: Decimal
+    default_stress: Decimal
+    recovery_rate: Decimal
+    funding_rate: Decimal
+    advance_rate: Decimal
+    initial_cash: Decimal
+    facility_limit: Decimal
+    acquisition_cost: Decimal
+    servicing_cost: Decimal
+    monthly_opex: Decimal
+    demand_growth: Decimal
+    loss_cap: Decimal
+    cash_floor: Decimal
+
+
+class RunManifest(TypedDict):
+    run_id: str
+    model_version: str
+    dataset_hash: str
+    policy: str
+    assumptions: dict[str, str | int]
+    expected_applications: str
+    currency: str
+    start_month: str
+    month_index_base: int
+    operating_horizon_months: int
+    full_runoff_months: int
+    data_classification: str
+    historical_evidence_level: str
+    checks: dict[str, str | bool]
+
+
+class StressCase(TypedDict):
+    default_stress: str
+    funding_rate: str
+
+
+class StressPoint(StressCase):
+    operating_result: str
+    contribution: str
+    minimum_cash: str
+    loss_ratio: str
+    additional_equity_required: str
+    eligible: bool
+    reasons: str
+    run_id: str
 
 
 def decimal_text(value: Decimal) -> str:
@@ -81,7 +137,7 @@ class Assumptions:
         with numeric_context():
             return min(D(1), rates[band] * self.default_stress)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str | int]:
         return {k: decimal_text(v) if isinstance(v, Decimal) else v for k, v in asdict(self).items()}
 
     @classmethod
@@ -105,7 +161,8 @@ class Assumptions:
                     converted[key] = D(str(value))
                 except DecimalException as error:
                     raise ValueError(f"{key} must be a finite decimal value.") from error
-        obj = replace(cls(), **converted)
+        # Allowed keys and each field's integer/Decimal domain are established above.
+        obj = replace(cls(), **cast(AssumptionOverrides, converted))
         obj.validate()
         return obj
 
@@ -219,7 +276,7 @@ class ModelResult:
     checks: Checks
     run_id: str
 
-    def manifest(self) -> dict:
+    def manifest(self) -> RunManifest:
         return {
             "run_id": self.run_id, "model_version": MODEL_VERSION,
             "dataset_hash": self.dataset_hash, "policy": self.policy,

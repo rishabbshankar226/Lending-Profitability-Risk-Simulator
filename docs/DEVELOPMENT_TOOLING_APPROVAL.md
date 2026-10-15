@@ -1,18 +1,19 @@
-# Development-tooling approval required
+# Development-tooling approval record
 
 Target: `rishabbshankar226/Lending-Profitability-Risk-Simulator` only.
 
 The user's scope lock states: **"STOP and ask for human approval before deleting
 directories, adding any new third-party dependency, or making breaking schema/API
-changes."** The packages below are new to this repository, so they have not been
-installed in its verification environment or added to its active requirements.
-The numerical fixes and complete reviewable patches are already prepared.
+changes."** The concrete proposal below was presented before installation.
+The user approved it with "continue" on October 15, 2026. Only the four named
+direct development packages and their five resolved additions were installed
+and added. The package installation report is retained with the review evidence.
 
-## Concrete requested addition
+## Approved addition
 
-Add these exact development-only dependencies to `requirements-dev.txt` and the
-`dev` optional group, pin the resolved additions in the development/browser
-constraints, finish source annotations, and enforce Ruff/strict mypy in CI.
+These exact development-only dependencies are in `requirements-dev.txt` and the
+`dev` optional group, with resolved additions pinned in development/browser
+constraints. Source annotations are repaired and CI requires Ruff/strict mypy.
 Runtime dependencies and the existing financial output field shapes stay as
 currently implemented. This approval does not include a merge, deployment,
 directory deletion or another repository.
@@ -24,7 +25,7 @@ directory deletion or another repository.
 | pandas-stubs | 2.2.3.250527 | Typing aligned with the existing pandas 2.2.3 boundary |
 | plotly-stubs | 0.1.4 | Type coverage for the existing untyped chart dependency |
 
-The read-only pip resolution proposes five additional transitive packages:
+The approved resolution adds five transitive packages:
 
 | Transitive addition | Exact version |
 | --- | --- |
@@ -37,29 +38,30 @@ The read-only pip resolution proposes five additional transitive packages:
 PyPI package metadata and a Python 3.12 pip `--dry-run --report` resolved these
 versions on October 15, 2026. No existing runtime package upgrade was proposed.
 The review export includes the complete metadata, wheel hashes and resolution
-report. Availability is verified; type compatibility still needs the actual
-post-approval compiler run and source repairs. XlsxWriter's untyped boundary
-also needs explicit application typing; no nonexistent stub package is proposed.
-The same nine proposed exact versions returned zero matched advisories in a
-read-only OSV query; its dated request/response is included in the review export.
+report. The post-approval full compiler run passes all 22 application files.
+XlsxWriter's consumed API has explicit first-party declarations checked against
+the installed 3.2.9 source; no additional third-party stub was installed.
+The current 59-version runtime/browser/build/development set returned zero
+matched advisories in an OSV query retained with the review export.
 That point-in-time lookup does not establish absence of undisclosed defects.
 
-## Why completion needs this step
+## Source repairs and verification
 
 The baseline full strict-mypy command reported 280 errors in 17 source files.
-The numerical checkpoint still reports 278, including missing source annotations,
+The numerical checkpoint reported 278, including missing source annotations,
 unparameterized containers, dynamic boundary values and missing pandas/Plotly/
-XlsxWriter type coverage. Installing tools alone will not fix those source errors.
-The proposed next step includes repairing them without replacing the existing
-architecture or weakening financial/state assertions.
+XlsxWriter type coverage. Installing the tools exposed 285 errors before source
+repairs. The final local strict run reports zero issues in all 22 source files.
+Existing financial/state assertions are unchanged; all 200 tests pass locally,
+including six added reporting regressions. Installation alone was not completion.
 
-An already available checker installation was used read-only: the new numeric
-and JSON intake modules pass strict mypy, and application/test lint passes.
-Those limited results are not represented as a passing full-project type check.
-The current CI workflow retains its existing tests; it does not yet enforce the
-missing project-wide type gate. The PR remains a draft until that work is complete.
+The earlier limited checks from an existing checker installation are historical
+evidence. Verification now uses this repository's approved environment. CI
+requires dependency consistency, Ruff and full strict mypy before tests.
+The [audit ledger](AUDIT_2026-10-15.md) records exact final CI/browser evidence;
+the [typing boundary record](../typings/README.md) states static-analysis limits.
 
-## Acceptance after approval
+## Approved acceptance criteria
 
 - Add only the named direct packages and their exact resolved dependencies.
 - Run `python -m mypy --strict lending_simulator app.py` with no application Any

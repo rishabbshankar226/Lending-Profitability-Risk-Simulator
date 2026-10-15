@@ -1,24 +1,26 @@
 """Consistent axes, identities, and full-resolution analytical figures."""
 
+from collections.abc import Sequence
 from datetime import date
 
 import plotly.graph_objects as go
 import streamlit as st
 
 from lending_simulator.presentation import monthly_frame
+from lending_simulator.types import ModelResult
 from lending_simulator.ui.data import profit_bridge
 from lending_simulator.ui.formatting import money
 from lending_simulator.ui.theme import FONT, INK, MUTED, TEAL
 
 
-def dates(result):
+def dates(result: ModelResult) -> list[date]:
     year, month = map(int, result.manifest()['start_month'].split('-'))
     ordinal = year * 12 + month - 1
     return [date((ordinal + row.month) // 12, (ordinal + row.month) % 12 + 1, 1)
             for row in result.monthly]
 
 
-def style(fig, height=330):
+def style(fig: go.Figure, height: int = 330) -> go.Figure:
     fig.update_layout(height=height, margin={'l': 10, 'r': 18, 't': 34, 'b': 25},
         font={'family': FONT, 'size': 14, 'color': INK}, paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)', hovermode='x unified',
@@ -29,12 +31,12 @@ def style(fig, height=330):
     return fig
 
 
-def show(fig, key, height=330):
+def show(fig: go.Figure, key: str, height: int = 330) -> None:
     st.plotly_chart(style(fig, height), width='stretch', key=key,
                     config={'displaylogo': False, 'responsive': True})
 
 
-def timeline(result, fields):
+def timeline(result: ModelResult, fields: Sequence[tuple[str, str]]) -> go.Figure:
     frame = monthly_frame(result)
     fig = go.Figure()
     palette = [TEAL, '#8A477B', '#84734D']
@@ -47,7 +49,7 @@ def timeline(result, fields):
     return fig
 
 
-def cash_chart(result, include_debt=False):
+def cash_chart(result: ModelResult, include_debt: bool = False) -> go.Figure:
     fields = [('ending_cash', 'Month-end cash')]
     if include_debt:
         fields.append(('ending_debt', 'Drawn debt'))
@@ -61,7 +63,7 @@ def cash_chart(result, include_debt=False):
     return fig
 
 
-def bridge_chart(result):
+def bridge_chart(result: ModelResult) -> go.Figure:
     rows = profit_bridge(result)
     fig = go.Figure(go.Waterfall(orientation='h', y=[name for name, _ in rows],
         x=[float(value) for _, value in rows], measure=['relative'] * (len(rows) - 1) + ['total'],

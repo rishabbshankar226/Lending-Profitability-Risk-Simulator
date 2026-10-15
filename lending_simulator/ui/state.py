@@ -3,9 +3,10 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
+from typing import TypedDict
 
 from lending_simulator.numeric import isolated
-from lending_simulator.types import Assumptions
+from lending_simulator.types import Assumptions, StressCase, StressPoint
 
 D = Decimal
 # Model field, widget key, user-facing label, unit scale.
@@ -31,6 +32,11 @@ FIELDS = (
 )
 
 
+class StressRun(TypedDict):
+    run_id: str
+    points: tuple[StressPoint, ...]
+
+
 @dataclass(frozen=True)
 class DraftChange:
     field: str
@@ -40,14 +46,14 @@ class DraftChange:
 
 
 @isolated
-def controls_for(assumptions: Assumptions) -> dict:
+def controls_for(assumptions: Assumptions) -> dict[str, int | float]:
     return {key: int(getattr(assumptions, field)) if field == 'recovery_lag'
             else float(getattr(assumptions, field) * scale)
             for field, key, _, scale in FIELDS}
 
 
 @isolated
-def _value(raw, field: str, scale: int):
+def _value(raw: object, field: str, scale: int) -> Decimal | int | None:
     if raw is None:
         return None
     try:
@@ -59,16 +65,15 @@ def _value(raw, field: str, scale: int):
     return int(value) if field == 'recovery_lag' and value == int(value) else value
 
 
-def parse_controls(controls: Mapping) -> Assumptions:
-    values = {}
+def parse_controls(controls: Mapping[str, object]) -> Assumptions:
+    values: dict[str, object] = {}
     for field, key, label, scale in FIELDS:
         value = _value(controls.get(key), field, scale)
         if value is None:
             raise ValueError(f'{label}: enter a finite number.')
         values[field] = value
-    assumptions = Assumptions(**values)
     try:
-        assumptions.validate()
+        assumptions = Assumptions.from_dict(values)
     except ValueError as error:
         message = str(error)
         for field, _, label, _ in sorted(FIELDS, key=lambda item: len(item[0]), reverse=True):
@@ -77,7 +82,7 @@ def parse_controls(controls: Mapping) -> Assumptions:
     return assumptions
 
 
-def draft_changes(controls: Mapping, applied: Assumptions) -> tuple[DraftChange, ...]:
+def draft_changes(controls: Mapping[str, object], applied: Assumptions) -> tuple[DraftChange, ...]:
     changes = []
     for field, key, label, scale in FIELDS:
         before = getattr(applied, field)
@@ -87,7 +92,9 @@ def draft_changes(controls: Mapping, applied: Assumptions) -> tuple[DraftChange,
     return tuple(changes)
 
 
-def stage_case(applied: Assumptions, controls: Mapping, point: Mapping) -> dict:
+def stage_case(
+    applied: Assumptions, controls: Mapping[str, object], point: StressCase,
+) -> dict[str, int | float]:
     if draft_changes(controls, applied):
         raise ValueError('Apply or restore unapplied changes before staging a stress case.')
     staged = replace(applied, default_stress=D(point['default_stress']), funding_rate=D(point['funding_rate']))

@@ -1,6 +1,7 @@
 """Useful SQLite aggregations; a private short-lived database for each call."""
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from decimal import Decimal
 from importlib.resources import files
@@ -19,7 +20,7 @@ def query_text(name: str) -> str:
 
 
 @contextmanager
-def _database(dataset: Dataset):
+def _database(dataset: Dataset) -> Iterator[sqlite3.Connection]:
     dataset.validate()
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
@@ -44,7 +45,7 @@ def _database(dataset: Dataset):
         db.close()
 
 
-def policy_population(dataset: Dataset) -> tuple[dict, ...]:
+def policy_population(dataset: Dataset) -> tuple[dict[str, object], ...]:
     """Raw base counts, without projected demand weights."""
     with _database(dataset) as db:
         return tuple(dict(row) for row in db.execute(query_text("policy_population")))
