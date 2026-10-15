@@ -8,8 +8,6 @@ The app models a hypothetical lender retaining 12-month merchant-financed instal
 
 **UI workbench:** the owner approved merging the redesigned interface into `main` on October 10, 2026 (UTC). [PR #4](https://github.com/rishabbshankar226/Lending-Profability-Risk-Simulator/pull/4) records the integration. Read the [workbench review and release checks](docs/ui-workbench-review.md). The public dashboard and existing media show the earlier `feature/lending-simulator` build; 14 real-browser journeys pass, with [before/after captures and scoped results](docs/workbench-browser-validation.md). Deployment remains pending.
 
-**Start here:** [Two-minute reviewer guide](docs/reviewer-guide.md) · [Application and interview notes](docs/interview-notes.md)
-
 **Earlier hosted-build tour:** [90-second captioned screenshot video](docs/tour/lending-simulator-tour.mp4) · [Transcript and source captures](docs/tour/README.md). Six real dashboard screenshots, assembled with captions; no audio or continuous interaction recording.
 
 ![Finance workbench in actual Chromium](docs/screenshots/workbench/desktop-1440-overview.png)
