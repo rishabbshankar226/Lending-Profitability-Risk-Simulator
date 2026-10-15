@@ -73,7 +73,12 @@ An eligible policy funds loans, reconciles, has full-runoff net loss at or below
 
 ## Numerical checks
 
-Use 34-digit Decimal arithmetic and a $1e−16 internal absolute tolerance. Input principal is integer cents; no intermediate currency rounding is applied. Each month checks:
+Model version 0.1.1 uses fresh 96-digit HALF_EVEN Decimal contexts with explicit
+DivisionByZero, InvalidOperation, Overflow and Underflow traps, plus bounded
+rate/hazard cancellation guard precision (at most 4,096 digits). Financial
+reconciliation uses a $1e−16 internal absolute tolerance. Count-domain validation
+uses a separate precision-derived ULP allowance in count units; the reported
+approval ratio is bounded to [0, 1] after negligible aggregation roundoff. Input principal is integer cents; no intermediate currency rounding is applied. Each month checks:
 
 - Opening loans + originations − principal repayments − gross charge-offs = ending loans.
 - Opening debt + net draws = ending debt.
@@ -84,3 +89,10 @@ Use 34-digit Decimal arithmetic and a $1e−16 internal absolute tolerance. Inpu
 At runoff, performing loans and debt reach zero, and received recoveries equal the recovery fraction of gross charge-offs. Exposure limits prevent repayment/default exceeding outstanding principal and debt exceeding collateral or the facility cap.
 
 The immutable result bundle carries inputs, summary, monthly/cohort rows, checks, dataset hash and run ID. Canonical Decimal text gives numerically equal inputs the same identity. Dataset, model version, and all assumptions participate in cache/run identity. Session selections are isolated; there is no shared mutable SQLite connection.
+
+## Current audit and governance
+
+See [the audit ledger](AUDIT_2026-10-15.md) for reproduced failures and executed
+checks, and [model risk documentation](MODEL_RISK.md) for quantitative invariants,
+validation limits and institutional governance. Strict project-wide typing is
+an open release gate; the concrete dependency approval is documented separately.

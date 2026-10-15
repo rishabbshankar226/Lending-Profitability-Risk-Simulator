@@ -219,7 +219,7 @@ with st.sidebar:
         st.button("Higher defaults · 2×", key="example_defaults", on_click=load_example,
                   args=({"default_stress": D(2)},), width="stretch")
     st.slider("Monthly application growth (%)", -10.0, 10.0, step=.5, key="growth_percent",
-              on_change=sync_draft, help="Weights the fixed population, without changing risk mix or prices.")
+              on_change=sync_draft, help="Weights fixed application rows by month; supplied risk assumptions and prices stay fixed.")
     st.slider("Lifetime default stress (×)", 0.0, 5.0, step=.25, key="stress", on_change=sync_draft)
     st.slider("Annual funding rate (%)", 0.0, 30.0, step=.5, key="funding_percent", on_change=sync_draft)
     st.number_input("Starting equity cash ($)", step=50000.0, key="initial_cash", on_change=sync_draft)

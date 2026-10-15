@@ -1,5 +1,10 @@
 # Validation and release status
 
+This file retains historical evidence for the explicitly identified earlier
+revisions. Current 0.1.1 audit results and unresolved release gates are in
+[AUDIT_2026-10-15.md](AUDIT_2026-10-15.md). Earlier pass counts, run IDs and
+unchanged-model statements below do not verify this numerical migration.
+
 ## Performed locally
 
 The financial model, data, SQL, decision rules, exports, CLI, simulated dashboard and HTTP server have 118 passing automated checks in `tests/`. Run `python -m pytest`. The suite has no disabled or skipped checks. Python compilation and the reproducible base-case CLI also passed. The [workbench candidate review](ui-workbench-review.md) identifies the tested implementation commit, new behavior and scoped browser acceptance. Earlier hosted checks below do not cover this redesign.

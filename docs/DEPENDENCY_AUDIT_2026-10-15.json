@@ -1,0 +1,409 @@
+{
+  "checked_on": "2026-10-15T18:41:30.503166+00:00",
+  "queries": [
+    {
+      "package": {
+        "name": "altair",
+        "ecosystem": "PyPI"
+      },
+      "version": "6.3.0"
+    },
+    {
+      "package": {
+        "name": "anyio",
+        "ecosystem": "PyPI"
+      },
+      "version": "4.15.1"
+    },
+    {
+      "package": {
+        "name": "attrs",
+        "ecosystem": "PyPI"
+      },
+      "version": "26.1.0"
+    },
+    {
+      "package": {
+        "name": "certifi",
+        "ecosystem": "PyPI"
+      },
+      "version": "2026.7.22"
+    },
+    {
+      "package": {
+        "name": "charset-normalizer",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.5.2"
+    },
+    {
+      "package": {
+        "name": "click",
+        "ecosystem": "PyPI"
+      },
+      "version": "8.5.0"
+    },
+    {
+      "package": {
+        "name": "et_xmlfile",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.0.0"
+    },
+    {
+      "package": {
+        "name": "greenlet",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.5.6"
+    },
+    {
+      "package": {
+        "name": "h11",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.16.0"
+    },
+    {
+      "package": {
+        "name": "httptools",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.9.0"
+    },
+    {
+      "package": {
+        "name": "idna",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.20"
+    },
+    {
+      "package": {
+        "name": "iniconfig",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.3.1"
+    },
+    {
+      "package": {
+        "name": "itsdangerous",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.2.0"
+    },
+    {
+      "package": {
+        "name": "Jinja2",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.1.6"
+    },
+    {
+      "package": {
+        "name": "jsonschema",
+        "ecosystem": "PyPI"
+      },
+      "version": "4.26.0"
+    },
+    {
+      "package": {
+        "name": "jsonschema-specifications",
+        "ecosystem": "PyPI"
+      },
+      "version": "2025.9.1"
+    },
+    {
+      "package": {
+        "name": "MarkupSafe",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.0.4"
+    },
+    {
+      "package": {
+        "name": "narwhals",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.27.1"
+    },
+    {
+      "package": {
+        "name": "numpy",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.5.4"
+    },
+    {
+      "package": {
+        "name": "openpyxl",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.1.5"
+    },
+    {
+      "package": {
+        "name": "packaging",
+        "ecosystem": "PyPI"
+      },
+      "version": "26.3"
+    },
+    {
+      "package": {
+        "name": "pandas",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.2.3"
+    },
+    {
+      "package": {
+        "name": "pillow",
+        "ecosystem": "PyPI"
+      },
+      "version": "12.3.0"
+    },
+    {
+      "package": {
+        "name": "playwright",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.58.0"
+    },
+    {
+      "package": {
+        "name": "plotly",
+        "ecosystem": "PyPI"
+      },
+      "version": "7.1.0"
+    },
+    {
+      "package": {
+        "name": "pluggy",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.7.0"
+    },
+    {
+      "package": {
+        "name": "protobuf",
+        "ecosystem": "PyPI"
+      },
+      "version": "7.36.2"
+    },
+    {
+      "package": {
+        "name": "pyarrow",
+        "ecosystem": "PyPI"
+      },
+      "version": "25.0.1"
+    },
+    {
+      "package": {
+        "name": "pydeck",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.9.3"
+    },
+    {
+      "package": {
+        "name": "pyee",
+        "ecosystem": "PyPI"
+      },
+      "version": "13.0.1"
+    },
+    {
+      "package": {
+        "name": "Pygments",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.21.0"
+    },
+    {
+      "package": {
+        "name": "pytest",
+        "ecosystem": "PyPI"
+      },
+      "version": "9.1.1"
+    },
+    {
+      "package": {
+        "name": "python-dateutil",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.9.0.post0"
+    },
+    {
+      "package": {
+        "name": "python-multipart",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.0.32"
+    },
+    {
+      "package": {
+        "name": "pytz",
+        "ecosystem": "PyPI"
+      },
+      "version": "2026.5"
+    },
+    {
+      "package": {
+        "name": "referencing",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.37.0"
+    },
+    {
+      "package": {
+        "name": "requests",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.34.2"
+    },
+    {
+      "package": {
+        "name": "rpds-py",
+        "ecosystem": "PyPI"
+      },
+      "version": "2026.9.1"
+    },
+    {
+      "package": {
+        "name": "six",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.17.0"
+    },
+    {
+      "package": {
+        "name": "starlette",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.8.0"
+    },
+    {
+      "package": {
+        "name": "streamlit",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.65.0"
+    },
+    {
+      "package": {
+        "name": "toml",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.10.2"
+    },
+    {
+      "package": {
+        "name": "typing_extensions",
+        "ecosystem": "PyPI"
+      },
+      "version": "4.16.0"
+    },
+    {
+      "package": {
+        "name": "tzdata",
+        "ecosystem": "PyPI"
+      },
+      "version": "2026.5"
+    },
+    {
+      "package": {
+        "name": "urllib3",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.8.0"
+    },
+    {
+      "package": {
+        "name": "uvicorn",
+        "ecosystem": "PyPI"
+      },
+      "version": "0.54.0"
+    },
+    {
+      "package": {
+        "name": "watchdog",
+        "ecosystem": "PyPI"
+      },
+      "version": "6.0.0"
+    },
+    {
+      "package": {
+        "name": "websockets",
+        "ecosystem": "PyPI"
+      },
+      "version": "17.2"
+    },
+    {
+      "package": {
+        "name": "xlsxwriter",
+        "ecosystem": "PyPI"
+      },
+      "version": "3.2.9"
+    },
+    {
+      "package": {
+        "name": "setuptools",
+        "ecosystem": "PyPI"
+      },
+      "version": "84.0.0"
+    }
+  ],
+  "response": {
+    "results": [
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {}
+    ]
+  }
+}

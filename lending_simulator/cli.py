@@ -17,7 +17,10 @@ from lending_simulator.types import Assumptions
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", type=Path, default=Path(__file__).resolve().parents[1] / "data" / "applications.csv")
+    default_dataset = Path(__file__).resolve().parent / "sample_data" / "applications.csv"
+    if not default_dataset.is_file():
+        default_dataset = Path(__file__).resolve().parents[1] / "data" / "applications.csv"
+    parser.add_argument("--dataset", type=Path, default=default_dataset)
     parser.add_argument("--assumptions", type=Path, help="Assumptions JSON or a downloaded manifest.json")
     parser.add_argument("--output", type=Path, default=Path("artifacts/base-case"))
     args = parser.parse_args(argv)

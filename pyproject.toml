@@ -14,11 +14,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "openpyxl==3.1.5"]
 
-[tool.setuptools.packages.find]
-include = ["lending_simulator*"]
+[tool.setuptools]
+packages = ["lending_simulator", "lending_simulator.ui", "lending_simulator.sample_data"]
+
+[tool.setuptools.package-dir]
+"lending_simulator.sample_data" = "data"
 
 [tool.setuptools.package-data]
 lending_simulator = ["queries/*.sql", "evidence/*.json"]
+"lending_simulator.sample_data" = ["applications.csv", "manifest.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
