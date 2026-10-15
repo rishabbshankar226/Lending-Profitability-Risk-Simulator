@@ -3,8 +3,8 @@
 from decimal import Decimal as D
 from pathlib import Path
 
-from streamlit.testing.v1 import AppTest
 import streamlit as st
+from streamlit.testing.v1 import AppTest
 
 from lending_simulator import decisions
 from lending_simulator.ui import downloads
@@ -69,7 +69,7 @@ def test_pinned_applied_baseline_survives_examples_and_reset_clears_it():
     app.button(key='example_capital').click().run()
     assert not app.exception
     assert app.session_state['active_view'] == 'Policies'
-    assert app.session_state['baseline'].results[0].run_id == '5a88f7bef3fa93d4'
+    assert app.session_state['baseline'].results[0].run_id == '438a13c9e03c52a9'
     assert app.session_state['applied_policy'] == 'balanced'
     app.button(key='reset').click().run()
     assert app.session_state['active_view'] == 'Overview'

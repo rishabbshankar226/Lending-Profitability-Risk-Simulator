@@ -1,7 +1,7 @@
+import json
 from dataclasses import replace
 from decimal import Decimal as D
 from pathlib import Path
-import json
 
 import pytest
 

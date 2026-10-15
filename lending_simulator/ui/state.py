@@ -1,9 +1,10 @@
 """Pure draft transformations. Applying results remains an explicit transaction."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from decimal import Decimal, InvalidOperation
-from typing import Mapping
 
+from lending_simulator.numeric import isolated
 from lending_simulator.types import Assumptions
 
 D = Decimal
@@ -38,12 +39,14 @@ class DraftChange:
     after: Decimal | int | None
 
 
+@isolated
 def controls_for(assumptions: Assumptions) -> dict:
     return {key: int(getattr(assumptions, field)) if field == 'recovery_lag'
             else float(getattr(assumptions, field) * scale)
             for field, key, _, scale in FIELDS}
 
 
+@isolated
 def _value(raw, field: str, scale: int):
     if raw is None:
         return None

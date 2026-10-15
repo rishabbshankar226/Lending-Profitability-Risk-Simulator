@@ -6,3 +6,10 @@ __pycache__/
 .streamlit/secrets.toml
 artifacts/
 .DS_Store
+.env
+.env.*
+!.env.example
+.mypy_cache/
+.ruff_cache/
+build/
+dist/

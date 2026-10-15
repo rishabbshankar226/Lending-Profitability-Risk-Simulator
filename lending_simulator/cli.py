@@ -1,15 +1,16 @@
 """Reproduce the same scenario bundle outside the dashboard."""
 
 import argparse
+import json
+import sys
 from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
-import json
-import sys
 
 from lending_simulator.data import load_dataset
 from lending_simulator.decisions import compare_policies, select_strategy
 from lending_simulator.exports import scenario_workbook, workbook_spec
+from lending_simulator.json_input import load_assumptions_document
 from lending_simulator.presentation import csv_package
 from lending_simulator.types import Assumptions
 
@@ -22,7 +23,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         dataset = load_dataset(args.dataset)
-        saved = json.loads(args.assumptions.read_text()) if args.assumptions else {}
+        saved = load_assumptions_document(args.assumptions) if args.assumptions else {}
         assumptions = Assumptions.from_dict(saved.get("assumptions", saved))
         if "dataset_hash" in saved and saved["dataset_hash"] != dataset.dataset_hash:
             raise ValueError("The manifest's dataset hash does not match the supplied CSV.")

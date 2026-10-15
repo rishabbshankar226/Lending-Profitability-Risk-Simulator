@@ -1,26 +1,50 @@
 """Only the selected analytical view is built on each rerun."""
 
+import json
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from decimal import Decimal as D
-import json
-from typing import Callable, Mapping
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from lending_simulator.analytics import policy_population, query_text
-from lending_simulator.decisions import Decision, select_strategy
 from lending_simulator.data import Dataset
+from lending_simulator.decisions import Decision, select_strategy
+from lending_simulator.presentation import (
+    assumption_register,
+    band_curves,
+    cohort_heatmap,
+    comparison_frame,
+    evidence_register,
+    limit_margins,
+    month_label,
+    monthly_frame,
+)
 from lending_simulator.types import ModelResult
-from lending_simulator.presentation import (monthly_frame, comparison_frame, cohort_heatmap,
-    band_curves, assumption_register, evidence_register, month_label, limit_margins)
 from lending_simulator.ui import charts
-from lending_simulator.ui.components import caption, policy_summary, readable_table, status_chip
-from lending_simulator.ui.data import ScenarioSnapshot, compare_snapshots, stress_frame, applied_case_index
-from lending_simulator.ui.formatting import money, percent, points, multiple, assumption_value
+from lending_simulator.ui.components import (
+    caption,
+    policy_summary,
+    readable_table,
+    status_chip,
+)
+from lending_simulator.ui.data import (
+    ScenarioSnapshot,
+    applied_case_index,
+    compare_snapshots,
+    stress_frame,
+)
+from lending_simulator.ui.formatting import (
+    assumption_value,
+    money,
+    multiple,
+    percent,
+    points,
+)
 from lending_simulator.ui.state import FIELDS, DraftChange, draft_changes
-from lending_simulator.ui.theme import POLICY_COLORS, BAND_COLORS
+from lending_simulator.ui.theme import BAND_COLORS, POLICY_COLORS
 
 
 @dataclass(frozen=True)
@@ -33,7 +57,7 @@ class ViewContext:
 
 
 def secondary_metrics(items):
-    for col, (label, value) in zip(st.columns(len(items)), items):
+    for col, (label, value) in zip(st.columns(len(items)), items, strict=True):
         with col:
             caption(label)
             st.markdown(f'**{value}**'.replace('$', r'\$'))
@@ -127,7 +151,7 @@ def baseline_panel(ctx):
 def render_policies(ctx):
     st.header('Policies')
     policy_summary(ctx.results, ctx.decision.recommended_policy, ctx.selected.policy)
-    for col, r in zip(st.columns(3), ctx.results):
+    for col, r in zip(st.columns(3), ctx.results, strict=False):
         with col:
             st.button(f'View {r.policy.title()}', key=f'view_{r.policy}', width='stretch', on_click=ctx.actions['view'], args=(r.policy,))
     data = comparison_frame(ctx.results)
@@ -171,7 +195,7 @@ def render_cohorts(ctx):
         fig = go.Figure(go.Heatmap(z=heatmap.values*100, x=list(heatmap.columns),
             y=[month_label(m) for m in heatmap.index], colorscale='Blues', zmin=0,
             zmax=cohort_scale(tuple(r.run_id for r in ctx.results), ctx.results)*100,
-            colorbar=dict(title='Net loss %'), hoverongaps=False,
+            colorbar={'title': 'Net loss %'}, hoverongaps=False,
             hovertemplate='Origination: %{y}<br>Loan age: %{x} months<br>Projected net loss: %{z:.2f}%<extra></extra>'))
         fig.update_xaxes(title='Loan age (months)', nticks=8)
         fig.update_yaxes(autorange='reversed', title='Origination month', nticks=12)
@@ -183,13 +207,13 @@ def render_cohorts(ctx):
     else:
         st.subheader('Risk-band repayment and net loss')
         for col, field, title, bound in zip(st.columns(2),
-            ['principal_repaid_ratio','net_loss_ratio'], ['Principal repaid / originated','Net loss / originated'], [True,False]):
+            ['principal_repaid_ratio','net_loss_ratio'], ['Principal repaid / originated','Net loss / originated'], [True,False], strict=True):
             with col:
                 fig = go.Figure()
                 for band, group in curves.groupby('risk_band', sort=False):
                     fig.add_scatter(x=group.age, y=group[field], name=band, mode='lines',
-                        line=dict(color=BAND_COLORS[band], width=2.5,
-                                  dash={'Low':'solid','Medium':'dash','High':'dot'}[band]),
+                        line={'color': BAND_COLORS[band], 'width': 2.5,
+                                  'dash': {'Low':'solid','Medium':'dash','High':'dot'}[band]},
                         hovertemplate='Age %{x} months<br>%{y:.2%}<extra>%{fullData.name}</extra>')
                 fig.update_xaxes(title='Loan age (months)', nticks=7)
                 fig.update_yaxes(title=title, tickformat='.0%', range=[0,1] if bound else None, rangemode='tozero')
@@ -222,8 +246,10 @@ def stress_panel(ctx):
         st.info('Net loss is unavailable: no principal was funded. Costs, cash, and failure reasons remain available.')
     else:
         def cell(value):
-            if pd.isna(value): return 'Unavailable'
-            if field == 'loss_ratio': return f'{value:.2%}'
+            if pd.isna(value):
+                return 'Unavailable'
+            if field == 'loss_ratio':
+                return f'{value:.2%}'
             return f'{"−" if value<0 else ""}${abs(value)/1000:,.0f}k' if abs(value)>=1000 else money(value)
         details = {(p['default_stress'],p['funding_rate']):p for p in frame.to_dict('records')}
         hover = [[f'{multiple(D(str(i)))} defaults · {percent(j)} funding<br>{metric}: '+
@@ -235,12 +261,12 @@ def stress_panel(ctx):
             texttemplate='%{text}', customdata=hover, hovertemplate='%{customdata}<extra></extra>',
             colorscale='Blues' if field=='loss_ratio' else 'Reds' if field=='additional_equity_required' else 'RdBu',
             zmid=float(ctx.selected.assumptions.cash_floor) if field=='minimum_cash' else 0 if field=='operating_result' else None,
-            colorbar=dict(title='Net loss ratio' if field=='loss_ratio' else 'USD', tickformat='.0%' if field=='loss_ratio' else '~s')))
+            colorbar={'title': 'Net loss ratio' if field=='loss_ratio' else 'USD', 'tickformat': '.0%' if field=='loss_ratio' else '~s'}))
         a = ctx.selected.assumptions
         present = applied_case_index(saved['points'], a) is not None
         if present:
             fig.add_scatter(x=[percent(a.funding_rate)], y=[multiple(a.default_stress)], mode='markers',
-                marker=dict(symbol='square-open',size=35,color='#182C3E',line=dict(width=2)),
+                marker={'symbol': 'square-open','size': 35,'color': '#182C3E','line': {'width': 2}},
                 showlegend=False, hoverinfo='skip')
         fig.update_xaxes(title='Annual funding rate', type='category')
         fig.update_yaxes(title='Lifetime PD multiplier', type='category')
@@ -261,7 +287,8 @@ def stress_panel(ctx):
     caption(f'Profit {money(pnl)} · Minimum cash {money(D(point["minimum_cash"]))} · Net loss '+
         (percent(None) if point['loss_ratio']=='None' else percent(D(point['loss_ratio'])))+
         f' · Equity gap {money(D(point["additional_equity_required"]))}.')
-    if point['reasons']: caption(point['reasons'])
+    if point['reasons']:
+        caption(point['reasons'])
     dirty = bool(draft_changes(st.session_state.draft_controls,ctx.selected.assumptions))
     st.button('Stage case as draft', key='stage_stress', disabled=dirty, on_click=ctx.actions['stage'])
     caption('Apply or restore unapplied changes before staging.' if dirty else 'Staging changes inputs only. Run scenario then compares all policies on those assumptions.')

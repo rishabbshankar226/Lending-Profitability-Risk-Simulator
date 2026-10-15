@@ -316,7 +316,7 @@ def zoom(review, controls):
     expect(page.get_by_role("heading", name="Recommended policy: Balanced", exact=True)).to_be_visible()
     review.close_sidebar()
     review.policy("Balanced")
-    assert review.applied_run() == "690e9fa563e2d475"
+    assert review.applied_run() == "89fea7fd94029201"
     review.check("Scaled native inputs apply a scenario and policy selection keeps the correct identity")
     page.get_by_role("button", name="Export", exact=True).click()
     with page.expect_download() as event:
@@ -325,7 +325,7 @@ def zoom(review, controls):
     assert download.failure() is None
     path = review.output / (review.name + "-" + download.suggested_filename)
     download.save_as(path)
-    assert "690e9fa563e2d475" in path.name and "690e9fa563e2d475" in path.read_text()
+    assert "89fea7fd94029201" in path.name and "89fea7fd94029201" in path.read_text()
     capture_zoom(review, "export")
     review.check("Export controls remain reachable and download the correct brief at native zoom", {"file": path.name, "bytes": path.stat().st_size})
 

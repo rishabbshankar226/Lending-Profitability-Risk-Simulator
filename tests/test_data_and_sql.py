@@ -1,10 +1,15 @@
-from dataclasses import replace
 from decimal import Decimal as D
 
 import pytest
 
 from lending_simulator.analytics import aggregate_for_model, policy_population
-from lending_simulator.data import Application, Dataset, generate_dataset, load_dataset, save_dataset
+from lending_simulator.data import (
+    Application,
+    Dataset,
+    generate_dataset,
+    load_dataset,
+    save_dataset,
+)
 
 
 def test_base_population_is_reproducible_exact_mix_and_integer_cents():

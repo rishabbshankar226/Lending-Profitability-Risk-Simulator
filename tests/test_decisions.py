@@ -1,10 +1,14 @@
 from dataclasses import replace
 from decimal import Decimal as D
 
-from lending_simulator.decisions import compare_policies, evaluate_policy, select_strategy
 from lending_simulator.data import generate_dataset
-from lending_simulator.types import Assumptions, CohortInput
+from lending_simulator.decisions import (
+    compare_policies,
+    evaluate_policy,
+    select_strategy,
+)
 from lending_simulator.model import run_model
+from lending_simulator.types import Assumptions, CohortInput
 
 
 def example(policy="aggressive"):

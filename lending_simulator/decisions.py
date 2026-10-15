@@ -1,12 +1,12 @@
 """Policy eligibility, honest recommendations, and scenario comparison."""
 
 from dataclasses import dataclass, replace
-from decimal import Decimal, localcontext
+from decimal import Decimal
 
 from lending_simulator.analytics import aggregate_for_model
 from lending_simulator.data import Dataset
 from lending_simulator.model import run_model
-from lending_simulator.types import Assumptions, ModelResult, POLICIES
+from lending_simulator.types import POLICIES, Assumptions, ModelResult
 
 
 @dataclass(frozen=True)
@@ -61,10 +61,8 @@ def select_strategy(results: tuple[ModelResult, ...]) -> Decision:
     eligible = [r for r in results if r.policy in eligible_policies]
     if not eligible:
         return Decision("no_eligible_policy", "No policy meets the selected credit-loss and cash limits. Review the failure reasons and additional equity requirement.", None, None, evaluations)
-    with localcontext() as ctx:
-        ctx.prec = 34
-        ordered = sorted(eligible, key=lambda r: (-r.summary.operating_result, r.summary.loss_ratio,
-                                                 -r.summary.minimum_cash, list(POLICIES).index(r.policy)))
+    ordered = sorted(eligible, key=lambda r: (r.summary.operating_result.copy_negate(), r.summary.loss_ratio,
+                                             r.summary.minimum_cash.copy_negate(), list(POLICIES).index(r.policy)))
     best = ordered[0]
     if best.summary.operating_result < 0:
         return Decision("no_profitable_policy", f"No eligible strategy is profitable. {best.policy.title()} is the least loss-making eligible policy, shown only as a diagnostic.", None, best.policy, evaluations)

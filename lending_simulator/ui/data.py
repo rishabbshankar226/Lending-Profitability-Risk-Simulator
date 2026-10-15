@@ -1,12 +1,13 @@
 """Exact comparison adapters and safe numeric data for the visual layer."""
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 
 from lending_simulator import MODEL_VERSION
 from lending_simulator.decisions import select_strategy
+from lending_simulator.numeric import numeric_context
 from lending_simulator.types import ModelResult
 
 D = Decimal
@@ -62,11 +63,11 @@ def compare_snapshots(baseline: ScenarioSnapshot, current: ScenarioSnapshot) -> 
                                   same_horizon, len(old.monthly), len(new.monthly), ())
     old_by_policy = {r.policy: r for r in baseline.results}
     deltas = []
-    with localcontext() as ctx:
-        ctx.prec = 34
+    with numeric_context():
         for result in current.results:
             before, after = old_by_policy[result.policy].summary, result.summary
-            ratio_diff = lambda a, b: None if a is None or b is None else (b - a) * 100
+            def ratio_diff(a: Decimal | None, b: Decimal | None) -> Decimal | None:
+                return None if a is None or b is None else (b - a) * 100
             deltas.append(PolicyDelta(result.policy,
                 after.operating_result - before.operating_result if same_horizon else None,
                 after.operating_result_24m - before.operating_result_24m,
@@ -80,11 +81,10 @@ def compare_snapshots(baseline: ScenarioSnapshot, current: ScenarioSnapshot) -> 
 def profit_bridge(result: ModelResult) -> tuple[tuple[str, Decimal], ...]:
     s = result.summary
     rows = (('Interest', s.interest_revenue), ('Merchant fees', s.merchant_fees),
-            ('Funding', -s.funding_expense), ('Servicing', -s.servicing_expense),
-            ('Acquisition', -s.acquisition_expense), ('Net credit loss', -s.net_credit_loss),
-            ('Platform expense', -s.platform_opex))
-    with localcontext() as ctx:
-        ctx.prec = 34
+            ('Funding', s.funding_expense.copy_negate()), ('Servicing', s.servicing_expense.copy_negate()),
+            ('Acquisition', s.acquisition_expense.copy_negate()), ('Net credit loss', s.net_credit_loss.copy_negate()),
+            ('Platform expense', s.platform_opex.copy_negate()))
+    with numeric_context():
         if abs(sum((value for _, value in rows), D(0)) - s.operating_result) > result.checks.tolerance:
             raise ValueError('Profit components do not reconcile to operating profit.')
     return rows + (('Operating profit', s.operating_result),)

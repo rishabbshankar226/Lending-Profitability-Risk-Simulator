@@ -1,3 +1,4 @@
+-c constraints-py312.txt
 streamlit==1.65.0
 pandas==2.2.3
 plotly==7.1.0

@@ -1,10 +1,10 @@
 """Lending workbench. Applied financial results are immutable until an explicit run."""
 
+import json
 from dataclasses import replace
 from decimal import Decimal as D
 from hashlib import sha256
 from pathlib import Path
-import json
 
 import pandas as pd
 import streamlit as st
@@ -13,12 +13,18 @@ from lending_simulator import MODEL_VERSION
 from lending_simulator.data import DEFAULT_SEED, load_dataset
 from lending_simulator.decisions import compare_policies, select_strategy, sensitivity
 from lending_simulator.presentation import assumption_register
-from lending_simulator.types import Assumptions, POLICIES
+from lending_simulator.types import POLICIES, Assumptions
 from lending_simulator.ui.components import caption, decision_summary, readable_table
 from lending_simulator.ui.data import ScenarioSnapshot
 from lending_simulator.ui.downloads import download_factory
-from lending_simulator.ui.formatting import money, percent, multiple, assumption_value
-from lending_simulator.ui.state import FIELDS, controls_for, parse_controls, draft_changes, stage_case
+from lending_simulator.ui.formatting import assumption_value, money, multiple, percent
+from lending_simulator.ui.state import (
+    FIELDS,
+    controls_for,
+    draft_changes,
+    parse_controls,
+    stage_case,
+)
 from lending_simulator.ui.theme import apply_styles
 from lending_simulator.ui.views import ViewContext, render
 
@@ -170,7 +176,7 @@ def stage_stress():
         st.session_state.scenario_error = str(error)
 
 
-st.set_page_config(page_title="Lending Profitability & Risk Simulator", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Lending Profitability & Risk Simulator", layout="wide")
 apply_styles()
 st.title("Lending workbench")
 caption("Compare lending policies under cash and credit limits. Synthetic, illustrative, uncalibrated projections · USD.")

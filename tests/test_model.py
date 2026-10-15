@@ -8,12 +8,12 @@ from lending_simulator.types import Assumptions, CohortInput
 
 
 def no_costs(**overrides):
-    values = dict(
-        borrower_rate=D(0), merchant_fee=D(0), funding_rate=D(0),
-        advance_rate=D(0), acquisition_cost=D(0), servicing_cost=D(0),
-        monthly_opex=D(0), pd_low=D(0), pd_medium=D(0), pd_high=D(0),
-        initial_cash=D(2000), cash_floor=D(0),
-    )
+    values = {
+        "borrower_rate": D(0), "merchant_fee": D(0), "funding_rate": D(0),
+        "advance_rate": D(0), "acquisition_cost": D(0), "servicing_cost": D(0),
+        "monthly_opex": D(0), "pd_low": D(0), "pd_medium": D(0), "pd_high": D(0),
+        "initial_cash": D(2000), "cash_floor": D(0),
+    }
     values.update(overrides)
     return Assumptions(**values)
 

@@ -1,18 +1,18 @@
-"""Runtime Excel download using the XlsxWriter stack in the approved plan.
+"""Scenario workbook snapshots and independent financial benchmarks.
 
 The workbook is a saved scenario plus small independent formula benchmarks.
 It does not recalculate the whole portfolio when someone edits an input cell.
 The same inspectable workbook specification supports the authoring QA renderer.
 """
 
-from dataclasses import asdict, fields
+from dataclasses import fields
 from decimal import Decimal
 from io import BytesIO
 
 import xlsxwriter
 
-from lending_simulator.presentation import RATE_INPUTS, units_for, workbook_payload
-from lending_simulator.types import MonthlyResult, CohortMonth
+from lending_simulator.presentation import units_for, workbook_payload
+from lending_simulator.types import CohortMonth, MonthlyResult
 
 ACCOUNTING = '$#,##0.00;($#,##0.00);"-"'
 NUMBER = '#,##0.00;(#,##0.00);"-"'
@@ -162,7 +162,6 @@ def scenario_workbook(result, results, dataset) -> bytes:
         normal = book.add_format({"font_name": "Arial", "font_size": 10, "valign": "vcenter"})
         header = book.add_format({"font_name": "Arial", "font_size": 10, "bold": True, "bg_color": "#243e54", "font_color": "white", "text_wrap": True, "valign": "vcenter"})
         formula = book.add_format({"font_name": "Arial", "font_size": 10, "num_format": ACCOUNTING})
-        editable = book.add_format({"font_name": "Arial", "font_size": 10, "font_color": "#1d4ed8", "bg_color": "#fff4cc", "num_format": NUMBER})
         for sheet in spec["sheets"]:
             ws = book.add_worksheet(sheet["name"])
             ws.hide_gridlines(2)
