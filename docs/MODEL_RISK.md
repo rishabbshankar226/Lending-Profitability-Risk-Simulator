@@ -51,9 +51,10 @@ paths are covered by 49 new tests, including 48 fixed-seed generated portfolios,
 independent numerical references, financial identities and threaded execution.
 The numerical implementation checkpoint has 193 passing unit/AppTest/HTTP
 cases in CI. A subsequent installed-wheel regression adds packaging coverage;
-the full follow-up passes 194 tests locally. No follow-up CI run was queued,
-so the earlier CI/browser passes do not verify the packaging repair. The
-[audit ledger](AUDIT_2026-10-15.md) records exact commands, revisions and evidence.
+the full follow-up passes 194 tests both locally and in CI. The verified
+follow-up CI also passes 15 browser journeys and two historical-reference
+captures. The [audit ledger](AUDIT_2026-10-15.md) records exact commands,
+revisions and evidence. These results do not resolve the strict-typing gate.
 
 These tests establish supported implementation behavior. They do not establish
 PD/recovery accuracy, sensitivity to real population shifts, actual liquidity,
