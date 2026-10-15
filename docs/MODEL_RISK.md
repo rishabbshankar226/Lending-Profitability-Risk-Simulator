@@ -50,8 +50,10 @@ count-denominator acceptances and one approval-bound failure. Their repaired
 paths are covered by 49 new tests, including 48 fixed-seed generated portfolios,
 independent numerical references, financial identities and threaded execution.
 The numerical implementation checkpoint has 193 passing unit/AppTest/HTTP
-cases. A subsequent installed-wheel regression adds packaging coverage; the
-[audit ledger](AUDIT_2026-10-15.md) records the exact commands and CI evidence.
+cases in CI. A subsequent installed-wheel regression adds packaging coverage;
+the full follow-up passes 194 tests locally. No follow-up CI run was queued,
+so the earlier CI/browser passes do not verify the packaging repair. The
+[audit ledger](AUDIT_2026-10-15.md) records exact commands, revisions and evidence.
 
 These tests establish supported implementation behavior. They do not establish
 PD/recovery accuracy, sensitivity to real population shifts, actual liquidity,

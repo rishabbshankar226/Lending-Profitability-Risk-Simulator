@@ -40,6 +40,9 @@ The review export includes the complete metadata, wheel hashes and resolution
 report. Availability is verified; type compatibility still needs the actual
 post-approval compiler run and source repairs. XlsxWriter's untyped boundary
 also needs explicit application typing; no nonexistent stub package is proposed.
+The same nine proposed exact versions returned zero matched advisories in a
+read-only OSV query; its dated request/response is included in the review export.
+That point-in-time lookup does not establish absence of undisclosed defects.
 
 ## Why completion needs this step
 
