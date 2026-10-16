@@ -59,6 +59,9 @@ check passes all 22 application files and all 200 tests pass locally, including
 six new reporting-boundary regressions. CI now
 requires linting, dependency consistency and full strict typing before tests.
 The ledger distinguishes earlier CI from verification of these final repairs.
+Final implementation `a35ba724` passes full strict typing, lint, all 200 tests
+and the 15 real-browser journeys plus two reference captures in CI run
+`38797068858`; the complete revision-specific logs accompany the review export.
 
 These tests establish supported implementation behavior. They do not establish
 PD/recovery accuracy, sensitivity to real population shifts, actual liquidity,

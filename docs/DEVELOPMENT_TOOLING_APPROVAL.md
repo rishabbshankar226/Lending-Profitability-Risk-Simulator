@@ -60,6 +60,8 @@ evidence. Verification now uses this repository's approved environment. CI
 requires dependency consistency, Ruff and full strict mypy before tests.
 The [audit ledger](AUDIT_2026-10-15.md) records exact final CI/browser evidence;
 the [typing boundary record](../typings/README.md) states static-analysis limits.
+Final implementation `a35ba724` passes the approved gates, all 200 tests and
+the real-browser suite in CI run `38797068858`.
 
 ## Approved acceptance criteria
 

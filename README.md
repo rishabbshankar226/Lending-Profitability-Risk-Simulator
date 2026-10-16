@@ -10,7 +10,7 @@ assumptions. It has no borrower scoring or historical calibration. Results are
 conditional projections, not evidence of actual lender performance.
 
 The audit repairs numerical, input-boundary and installed-package defects.
-Full strict typing, linting and the 200-test suite pass locally; these checks
+Full strict typing, linting and the 200-test suite pass locally and in CI; these checks
 are now required in CI. The [audit ledger](docs/AUDIT_2026-10-15.md) records
 revision-specific CI/browser results and the
 [approved development-tooling record](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
