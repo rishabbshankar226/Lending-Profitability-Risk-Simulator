@@ -1,13 +1,15 @@
 """Exact comparison adapters and safe numeric data for the visual layer."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, InvalidOperation
 
 import pandas as pd
 
 from lending_simulator import MODEL_VERSION
 from lending_simulator.decisions import select_strategy
-from lending_simulator.types import ModelResult
+from lending_simulator.numeric import numeric_context
+from lending_simulator.types import Assumptions, ModelResult, StressCase
 
 D = Decimal
 
@@ -21,7 +23,7 @@ class ScenarioSnapshot:
     origination_months: int
 
     @classmethod
-    def capture(cls, results: tuple[ModelResult, ...]):
+    def capture(cls, results: tuple[ModelResult, ...]) -> "ScenarioSnapshot":
         select_strategy(results)  # Reject mixed or duplicated comparison inputs.
         manifest = results[0].manifest()
         return cls(results, MODEL_VERSION, manifest['currency'], manifest['start_month'],
@@ -62,11 +64,11 @@ def compare_snapshots(baseline: ScenarioSnapshot, current: ScenarioSnapshot) -> 
                                   same_horizon, len(old.monthly), len(new.monthly), ())
     old_by_policy = {r.policy: r for r in baseline.results}
     deltas = []
-    with localcontext() as ctx:
-        ctx.prec = 34
+    with numeric_context():
         for result in current.results:
             before, after = old_by_policy[result.policy].summary, result.summary
-            ratio_diff = lambda a, b: None if a is None or b is None else (b - a) * 100
+            def ratio_diff(a: Decimal | None, b: Decimal | None) -> Decimal | None:
+                return None if a is None or b is None else (b - a) * 100
             deltas.append(PolicyDelta(result.policy,
                 after.operating_result - before.operating_result if same_horizon else None,
                 after.operating_result_24m - before.operating_result_24m,
@@ -80,23 +82,22 @@ def compare_snapshots(baseline: ScenarioSnapshot, current: ScenarioSnapshot) -> 
 def profit_bridge(result: ModelResult) -> tuple[tuple[str, Decimal], ...]:
     s = result.summary
     rows = (('Interest', s.interest_revenue), ('Merchant fees', s.merchant_fees),
-            ('Funding', -s.funding_expense), ('Servicing', -s.servicing_expense),
-            ('Acquisition', -s.acquisition_expense), ('Net credit loss', -s.net_credit_loss),
-            ('Platform expense', -s.platform_opex))
-    with localcontext() as ctx:
-        ctx.prec = 34
+            ('Funding', s.funding_expense.copy_negate()), ('Servicing', s.servicing_expense.copy_negate()),
+            ('Acquisition', s.acquisition_expense.copy_negate()), ('Net credit loss', s.net_credit_loss.copy_negate()),
+            ('Platform expense', s.platform_opex.copy_negate()))
+    with numeric_context():
         if abs(sum((value for _, value in rows), D(0)) - s.operating_result) > result.checks.tolerance:
             raise ValueError('Profit components do not reconcile to operating profit.')
     return rows + (('Operating profit', s.operating_result),)
 
 
-def stress_frame(points: tuple[dict, ...]) -> pd.DataFrame:
+def stress_frame(points: tuple[Mapping[str, object], ...]) -> pd.DataFrame:
     rows = []
     numeric = ('default_stress', 'funding_rate', 'operating_result', 'contribution',
                'minimum_cash', 'loss_ratio', 'additional_equity_required')
     for point in points:
         row = dict(point)
-        profit = None
+        profit = D(0)
         for field in numeric:
             raw = row[field]
             if field == 'loss_ratio' and (raw is None or raw == 'None'):
@@ -116,7 +117,7 @@ def stress_frame(points: tuple[dict, ...]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def applied_case_index(points: tuple[dict, ...], assumptions) -> int | None:
+def applied_case_index(points: tuple[StressCase, ...], assumptions: Assumptions) -> int | None:
     """Match the captured Decimal pair before any chart float conversion."""
     return next((index for index, point in enumerate(points)
         if D(point['default_stress']) == assumptions.default_stress

@@ -1,134 +1,213 @@
-# Lending Profitability & Risk Simulator
+# Lending Profitability and Risk Simulator
 
-Compare how expanding loan approvals changes credit losses, profit, debt use, and cash. A standalone portfolio project for fintech finance and credit/risk analysis, separate from the Financial Underwriting Tool.
+A deterministic expected-value model for a lender retaining 12-month installment
+loans. It compares three approval policies under credit-loss, collateral,
+facility and month-end cash constraints. Python calculates the financial results;
+a Streamlit workspace reviews applied scenarios, stress cases and exports.
 
-The app models a hypothetical lender retaining 12-month merchant-financed installment loans. Its 10,000 applications and risk assumptions are **synthetic and illustrative**. Historical sources provide context only; this is an **uncalibrated expected-value simulator**.
+The application uses 10,000 fictional applications and illustrative risk/cost
+assumptions. It has no borrower scoring or historical calibration. Results are
+conditional projections, not evidence of actual lender performance.
 
-**Live dashboard:** [Open the dashboard](https://rishabb-lending-simulator.streamlit.app/) · **Source code:** [main](https://github.com/rishabbshankar226/Lending-Profability-Risk-Simulator/tree/main) · **Workbench integration:** [PR #4](https://github.com/rishabbshankar226/Lending-Profability-Risk-Simulator/pull/4)
+The audit repairs numerical, input-boundary and installed-package defects.
+Full strict typing, linting and the 200-test suite pass locally and in CI; these checks
+are now required in CI. The [audit ledger](docs/AUDIT_2026-10-15.md) records
+revision-specific CI/browser results and the
+[approved development-tooling record](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
 
-**UI workbench:** the owner approved merging the redesigned interface into `main` on October 10, 2026 (UTC). [PR #4](https://github.com/rishabbshankar226/Lending-Profability-Risk-Simulator/pull/4) records the integration. Read the [workbench review and release checks](docs/ui-workbench-review.md). The public dashboard and existing media show the earlier `feature/lending-simulator` build; 14 real-browser journeys pass, with [before/after captures and scoped results](docs/workbench-browser-validation.md). Deployment remains pending.
+## Architecture
 
-**Earlier hosted-build tour:** [90-second captioned screenshot video](docs/tour/lending-simulator-tour.mp4) · [Transcript and source captures](docs/tour/README.md). Six real dashboard screenshots, assembled with captions; no audio or continuous interaction recording.
+| Module | Responsibility |
+| --- | --- |
+| `data.py`, `data/` | Validated immutable synthetic demand, isolated seeded generation and content identity |
+| `analytics.py`, `queries/` | Private SQLite aggregation of integer cents and demand-weighted cohorts |
+| `numeric.py` | Fresh Decimal contexts, finite arithmetic traps and cancellation precision budgets |
+| `types.py`, `model.py` | Assumptions, cohort repayment/default/recovery schedules, funding, cash and reconciliations |
+| `decisions.py` | Eligibility, exact profit ranking, tie resolution and deterministic stress cases |
+| `json_input.py`, `cli.py` | Bounded exact configuration intake and reproducible local scenario exports |
+| `presentation.py`, `exports.py` | Report adapters, exact CSV packages and workbook snapshots/benchmarks |
+| `ui/`, `app.py` | Draft/apply state, isolated visitor sessions, charts and deferred exports |
+| `typings/` | Source-checked declarations for consumed XlsxWriter APIs and documented dynamic boundaries |
 
-![Finance workbench in actual Chromium](docs/screenshots/workbench/desktop-1440-overview.png)
+The synthetic generator uses a fresh `random.Random(seed)` instance. Changing
+scenarios does not resample outcomes or mutate global random state. This model
+has no Monte Carlo paths, correlation matrices, VaR or expected-shortfall
+estimator. Monte Carlo standard errors and confidence intervals are therefore
+not quantities produced by this deterministic engine. Uncertainty in its
+illustrative PD/recovery assumptions requires empirical evidence that is absent.
 
-## The decision
+## Financial methodology
 
-Choose the highest full-runoff management operating profit among three policies that meet a net principal loss cap and minimum month-end cash floor. Defaults: 5% net loss and $50,000 cash. No eligible or profitable policy means no profitable recommendation.
+Originations occur at month-end, followed by 12 scheduled payment months.
+Defaults occur before each payment. Recoveries arrive after their configured
+lag. The common horizon is `24 + 12 + recovery_lag` months, including month zero;
+the default lag gives 39 monthly rows through December 2029.
 
-With $500,000 starting equity and a $2m facility, the base case demonstrates why profit alone is insufficient:
+- Monthly contractual payment is `P*r/(1-(1+r)^(-12))`, with annual nominal rate
+  divided by 12. Zero interest uses `P/12`. The last payment clears residual principal.
+- Monthly conditional hazard is `h = 1-(1-PD)^(1/12)`. Stressed lifetime PD is
+  capped at one. PD/rate bounds, nonnegative exposure and positive integer helper
+  terms are validated before arithmetic.
+- Expected ultimate loss attributable to a month’s defaults is
+  `opening performing EAD * h * LGD`, where `LGD = 1-recovery_rate`. Calendar-month
+  expense differs when recovery cash arrives later. Amortizing exposure and survivor weighting matter;
+  lifetime loss is not initial principal multiplied by lifetime PD without them.
+- Debt is the smaller of the facility cap and advance rate times ending
+  performing principal. Funding interest uses opening debt; debt reductions
+  require cash repayment.
+- Contribution includes interest and merchant fees less net credit loss,
+  funding, servicing and acquisition. Operating profit subtracts platform costs
+  throughout the common horizon. Principal repayments are not revenue, and a
+  charge-off is not a second cash payment.
+- Eligibility requires funded loans, passed financial checks, net loss at or
+  below its cap and minimum month-end cash at or above its floor. Eligible
+  policies rank by unrounded full-runoff profit, then loss, cash and fixed policy
+  order. Losses and breakeven do not produce a profitable recommendation.
 
-| Policy | Approval rate | Full-runoff operating profit | Net principal loss | Minimum cash | Eligible |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Conservative | 45% | $48,133 | 0.84% | $147,450 | Yes |
-| Balanced | 80% | $294,468 | 1.58% | −$696,143 | No: cash floor |
-| Aggressive | 100% | $396,446 | 2.29% | −$1,485,855 | No: cash floor |
+Fresh 96-digit Decimal contexts use HALF_EVEN and explicit DivisionByZero,
+InvalidOperation, Overflow and Underflow traps. Ambient rounding, precision and
+traps do not affect calculations. Rate/hazard cancellation uses additional
+guard precision, bounded at 4,096 digits; unsupported arithmetic fails explicitly.
+No currency quantization occurs inside the financial engine. Loan, debt, cash,
+cohort, equity and runoff checks use an absolute USD `1e-16` tolerance.
 
-These are conditional modeled results, not observed lender performance. See the [business memo](docs/business-memo.md) and [saved base-case manifest](docs/base-case.json).
+Count validation uses count units: a precision-derived allowance of at most
+one ULP per aggregated count term. A zero denominator cannot fund loans, and
+approval ratios remain in `[0,1]` after negligible aggregation roundoff.
+Financial loss/cash eligibility comparisons use no threshold epsilon.
 
-## Run locally
+Model version `0.1.1` identifies the corrected numerical semantics. Run IDs
+include the version, dataset, policy, assumptions and cohorts. The input/output
+field shapes and CLI options are retained. Old exported files remain unchanged;
+reproducing an old run exactly requires its original model revision. Passing an
+old input manifest to this release evaluates those inputs under this release.
 
-Use Python **3.12**. Direct dependency versions were installed and smoke-tested together.
+## Setup
+
+Prerequisites: Python 3.12 and a working local SQLite library. The committed
+constraints record the verified Python 3.12 Linux dependency resolution used
+for CI. They are not a certification of every operating system or interpreter.
+
+From the repository root:
 
 ```bash
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
-python -m streamlit run app.py
+python -m pip check
+python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-On Windows, activate with `.venv\Scripts\activate`. Open the localhost URL printed by Streamlit. The app preloads the dataset and needs no upload, API key, or login.
+Open the localhost address printed by Streamlit. No credential, external API
+or upload is required for the bundled fictional data. Each browser session
+keeps its own draft and applied assumptions. Results change only after an
+explicit successful Run. Invalid drafts retain the previous accepted result.
+
+Runtime-only installation uses `requirements.txt`. Browser checks use
+`requirements-browser.txt`; all three have exact resolved constraints. The
+existing build dependency is pinned in `pyproject.toml`. Approved development
+tools are included in the development/browser environments. Runtime-only
+installations do not require the checkers or typing stubs.
+
+## CLI and input contracts
 
 ```bash
-python -m pytest
 python -m lending_simulator.cli --output artifacts/base-case
-python -m scripts.generate_dataset
 ```
 
-The CLI produces three scenario workbooks, exact-value CSV packages, comparison metadata, and a workbook specification. Regeneration reproduces the committed application CSV and content hash.
+The built wheel contains its default dataset and resources, so the CLI also
+runs outside the checkout after installation. The Streamlit entrypoint remains
+a source-checkout workflow. The command writes each policy's exact CSV ZIP and workbook, plus
+`comparison.json` and `workbook-spec.json`. The CSV package includes exact
+Decimal strings, units and the selected manifest. Chart numbers and workbook
+numeric cells use display precision; they are not an exact financial transport.
+Workbook portfolio sheets are saved snapshots; isolated amortization/default
+benchmarks contain live formulas.
 
-Application CSV records must contain exactly four fields in the declared order: `application_id`, `month`, `risk_band`, `principal_cents`. Extra cells, missing cells, and malformed quoting produce a validation error before dashboard calculations or CLI outputs. Quoted IDs, blank lines, Windows line endings, and a header-only empty dataset remain supported.
+A complete custom configuration example:
 
-The server test starts Streamlit on a temporary local port, checks HTTP health and the frontend document, then stops it. This verifies startup; it does not inspect browser rendering or interactions.
+```bash
+cat > /tmp/lending-assumptions.json <<'JSON'
+{"initial_cash":"1250000","default_stress":"1","funding_rate":"0.08"}
+JSON
+python -m lending_simulator.cli --assumptions /tmp/lending-assumptions.json --output artifacts/capital
+```
 
-Run the separate real-browser suite with:
+Configuration files accept an assumptions object or a downloaded manifest with
+an `assumptions` object. Financial values may be decimal strings; original JSON
+numeric tokens are decoded directly to Decimal. Unknown assumption fields,
+boolean money, non-finite values, duplicate JSON keys and invalid root shapes
+are rejected. Files are bounded at 1,000,000 actual bytes and 128 container levels.
+Failures return exit code 2 with a readable error; failed reconciliations return
+1; successful computations return 0.
+
+A custom application CSV uses exactly `application_id,month,risk_band,principal_cents`.
+IDs must be unique/nonblank, months must be integers 0–23, bands must be
+low/medium/high and principal must be positive integer cents, at most $1 million
+per application. Quoted IDs, blank lines, CRLF and an empty header-only dataset
+are supported. Unknown/extra/missing cells and malformed quoting are rejected.
+
+The default decision uses $500,000 starting cash and a $2 million facility:
+
+| Policy | Approval | Operating profit through runoff | Net loss | Minimum cash | Eligible |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Conservative | 45% | $48,133 | 0.84% | $147,450 | Yes |
+| Balanced | 80% | $294,468 | 1.58% | ($696,143) | No: cash floor |
+| Aggressive | 100% | $396,446 | 2.29% | ($1,485,855) | No: cash floor |
+
+These rounded display values accompany the current exact
+[base-case reference](docs/base-case.json). The policy settings are illustrative.
+
+## Verification
+
+With the environment active:
+
+```bash
+python -m pip check
+python -m ruff check lending_simulator app.py tests typings
+python -m mypy --strict lending_simulator app.py
+python -m pytest
+python -m compileall -q app.py lending_simulator
+python -m lending_simulator.cli --output artifacts/base-case
+python -m pip wheel --no-deps --wheel-dir artifacts/wheels .
+```
+
+For the existing real-browser checks:
 
 ```bash
 python -m pip install -r requirements-browser.txt
-python -m playwright install --with-deps --only-shell chromium
+python -m playwright install --with-deps chromium
 python -m scripts.browser_acceptance --output artifacts/browser-acceptance
-python -m scripts.browser_export_resilience --output artifacts/browser-acceptance/export-resilience
+python -m scripts.browser_export_resilience --output artifacts/export-resilience
+python -m scripts.browser_accessibility --output artifacts/accessibility
 ```
 
-This starts the unchanged application on loopback and exercises it in isolated Chromium. Reports include source hashes, viewport captures, traces, downloads and console/network diagnostics. The empty-input case uses a separate valid zero-row dataset with unchanged application/model code. GitHub Actions also captures the exact pre-redesign base for comparison. No hosting account is required for these checks.
+The browser programs own temporary loopback servers and isolated Chromium
+sessions. Their checks cover actual rendering, keyboard/reflow, state,
+downloads, server-generation failures and native zoom. AppTest and HTTP startup
+checks do not substitute for real browser execution.
 
-The export-resilience script uses a separate test-only entrypoint and fresh server/cache for each case. It holds one real CSV generation until the browser changes policy, or raises once inside the cached CSV builder. Every successful file uses the original builder and applied inputs. This fixture is never loaded by the production app; it verifies loading/error recovery without mocking financial results or claiming a throttled network transfer.
+[The audit ledger](docs/AUDIT_2026-10-15.md) records severity, baseline file/line
+evidence, exact remediation and executed results. Mypy checks all application
+modules with strict mode and forbids explicit application `Any` declarations.
+[Boundary declarations](typings/README.md) document third-party typing limits
+and the runtime coverage that complements them. The
+[tooling approval record](docs/DEVELOPMENT_TOOLING_APPROVAL.md) names exact
+versions and resolved additions. No check is claimed to pass until executed.
 
-To reproduce downloaded inputs, unzip `manifest.json` and use:
+## Model and operating governance
 
-```bash
-python -m lending_simulator.cli --assumptions path/to/manifest.json --output artifacts/reproduced
-```
+[Model specification](docs/model-spec.md) documents timing and accounting.
+[Model risk documentation](docs/MODEL_RISK.md) separates software verification,
+independent empirical validation and institutional governance.
+[Source fitness](docs/source-fitness.md) explains why historical sources remain
+contextual. Earlier validation reports, screenshots and example workbooks are
+historical evidence for their identified revisions, rather than validation of
+this changed calculation version.
 
-## Explore the dashboard
-
-Start with the decision summary and three primary metrics. **Recommended policy** compares all three policies; **Viewed policy** immediately selects the applied portfolio used by the metrics, charts and exports. The summary shows full-runoff operating profit, the cash cushion or shortfall relative to the floor, and credit-loss headroom or excess in percentage points. Actual minimum cash, loss ratio and both limits remain visible. **Applied inputs** in the toolbar retains the last successful run while you edit the sidebar.
-
-Dashboard and decision-brief percentage labels below 0.01% retain their nonzero sign as `<0.01%` or `−<0.01%`; exact zero remains `0.00%`. Lifetime-PD input controls also keep small entries visible after editing and applying, using significant-digit formatting. Calculations and exports keep their existing precision.
-
-Then explore the one-click examples:
-
-| Example | Selected policy | Change from base |
-| --- | --- | --- |
-| Base case | Conservative | Restore $500,000 equity and all base assumptions |
-| More capital · $1.25m | Balanced | Set starting equity to $1.25m |
-| Higher defaults · 2× | Conservative | Double lifetime default assumptions |
-
-Each example replaces all inputs, runs immediately, restores the First 24 months cohort cutoff and clears the old stress grid. It preserves the active view and a pinned baseline. Recommendations still compare all three policies using the model's rules.
-
-1. **Overview:** separate profit and liquidity timelines, dated cash-floor/minimum references, funded volume, contribution and a reconciled profit bridge.
-2. **Policies:** equal policy summaries, profit/cash-margin comparisons and a pinned applied baseline. Different runoff lengths use a common first-24-month profit delta.
-3. **Cohorts:** projected loss by origination month and loan age; blank future values and a shared scale across policies/cutoffs.
-4. **Funding & stress:** cash/debt, additional equity and a manually requested 20-case selected-policy grid. Inspect a case and stage its inputs before Run.
-5. **Methodology:** timing, assumptions, sources, financial checks, SQL, and run manifest.
-
-Committed sidebar edits show **Unapplied changes** and an input review; **Run scenario** applies them. **Restore applied inputs** discards the draft without running projections. Navigation and policy selection preserve drafts. **Reset to base** restores all assumptions, Conservative, Overview and the cohort cutoff, clearing stress and the pinned baseline. Only the selected analytical view is built on each rerun.
-
-Open **Export** for **Decision brief**, **Audit workbook** or **CSV results + manifest**. Each format is prepared only when requested and captures the viewed applied run; draft edits are not exported. **Preview decision brief** prepares only that report. Workbook portfolio sheets are saved snapshots; independent loan/recovery benchmarks contain editable formulas.
-
-## How it works
-
-| Layer | Files | Responsibility |
-| --- | --- | --- |
-| Dataset | `data.py`, `data/` | Immutable, validated seeded demand and provenance |
-| SQL analytics | `analytics.py`, `queries/*.sql` | Correct policy denominators and cohort inputs in integer cents |
-| Financial model | `model.py`, `types.py` | Pure expected-value repayment, defaults, recoveries, funding and cash |
-| Decisions | `decisions.py` | Exact eligibility, ranking, ties, stress cases and honest empty/loss states |
-| Presentation and exports | `presentation.py`, `exports.py` | Model tables, exact packages and reproducible reports |
-| Workbench | `ui/`, `app.py` | Draft/apply state, shared formatting, selected views, charts and deferred exports |
-
-Finance uses 34-digit Decimal arithmetic with a $1e−16 internal reconciliation tolerance. Chart values and workbook snapshots use ordinary numeric display precision; CSVs retain exact Decimal strings. The operating view has 24 origination months; the default comparison runs 39 months through complete recovery runoff. No charge-off is subtracted as a second cash payment.
-
-## Review and learn
-
-- [Two-minute reviewer guide for finance and credit/risk roles](docs/reviewer-guide.md)
-- [Project pitch, resume drafts and interview answer checkpoints](docs/interview-notes.md)
-- [Model specification and assumptions](docs/model-spec.md)
-- [Dataset dictionary and SQL walkthrough](docs/data-and-sql.md)
-- [Historical source-fitness decision](docs/source-fitness.md)
-- [Validation and measured limitations](docs/validation.md)
-- [UI workbench review and state contract](docs/ui-workbench-review.md)
-- [Base-case audit workbook](docs/audit-workbook.xlsx)
-- Decision brief examples: [base](docs/base-decision-brief.md), [capital](docs/capital-decision-brief.md), [default stress](docs/default-stress-decision-brief.md)
-- [Interview and 90-second demo walkthrough](docs/walkthrough.md)
-- [Hosted review deployment](docs/deployment.md)
-- [Live browser results and screenshots](docs/browser-validation.md)
-- [Browser and release checklist](docs/release-checklist.md)
-
-All 144 automated model, application-state, export, and HTTP startup checks pass. Workbench coverage includes draft preservation/restoration, immediate policy selection, hidden-view navigation, immutable baseline comparison, exact stress staging/markers, undefined values and deferred format generation. CSV regressions cover row width, malformed quoting, CLI output preservation, and dashboard startup failure. The financial engine, model version and example run identities are unchanged; three saved decision briefs match exact regeneration. [Earlier operation measurements](docs/workbench-performance.json), pinned before the later readability changes, cover local server code and AppTest; they do not measure browser or hosting latency.
-
-The separate Chromium workflow passed 14 real-browser journeys (94 checks) at 1440, 1280, 390 and 320 CSS-pixel widths, plus two captures of the exact pre-redesign base. It checks rendering/reflow, keyboard/focus, WebSockets, actual exports, captured-file identity, browser cancellation/retry and an empty input source. Two controlled export cases prove selection during held server generation and recovery after an uncached builder failure. Three further journeys verify exposed native control names/main headings, expanded-view/input/error HTML readability, reference SQL/manifest contents and actual 200%/400% Chrome zoom. The 27 saved images are raw browser captures. [Browser evidence and screenshots](docs/workbench-browser-validation.md) distinguish these results from physical devices, full accessibility and hosting behavior still awaiting review.
-
-The earlier hosted desktop build was exercised across all five tabs, scenario apply/reset, capital and stress cases, validation errors, cohort cutoffs, and downloads. Guided examples were checked for the correct applied runs, replacement of draft/advanced inputs, stress-grid clearing and keyboard activation. The three actual decision-brief downloads matched local regeneration exactly; the capital brief retained applied inputs during a draft edit, and its saved manifest reproduced the same CLI decision and run. The comparison summaries were verified at base and $1.25m starting equity. See the browser evidence for tested commits and run IDs. Missing or invalid base data stops the dashboard with a clear error; validated replacements refresh the applied scenario and exports.
-
-PR #1 is merged into `main`, with passing GitHub checks. The live demo still uses `feature/lending-simulator`; that branch is retained for hosting and does not yet include the decision-panel upgrade. The existing screenshots and tour show that earlier build. Public-host anonymous access, physical-device and full accessibility checks, hosting load measurements, and a continuous interactive walkthrough recording remain pending. The hosting public setting was observed, but an isolated anonymous browser was unavailable.
+The model excludes prepayment, delinquency stages, taxes, loan sales, price
+response, intramonth liquidity and GAAP/CECL provision timing. Negative cash is
+an unfunded diagnostic path, not invented financing. Institutional policy
+approval, appropriate deployment access/TLS/host controls and independent
+validation are prerequisites for real lending use. The audit does not certify
+credit prediction accuracy or regulatory compliance.

@@ -5,19 +5,29 @@ from decimal import Decimal as D
 
 import pytest
 
+from lending_simulator.data import Dataset, generate_dataset
+from lending_simulator.decisions import compare_policies, sensitivity
+from lending_simulator.types import Assumptions
+from lending_simulator.ui.data import (
+    ScenarioSnapshot,
+    compare_snapshots,
+    profit_bridge,
+    stress_frame,
+)
+from lending_simulator.ui.formatting import money, percent, points
+from lending_simulator.ui.state import (
+    controls_for,
+    draft_changes,
+    parse_controls,
+    stage_case,
+)
+
 
 @pytest.mark.parametrize('missing', [float('nan'), D('NaN'), None])
 def test_undefined_chart_values_use_unavailable_without_numeric_fabrication(missing):
     assert money(missing) == 'Unavailable'
     assert percent(missing) == 'Unavailable'
     assert points(missing) == 'Unavailable'
-
-from lending_simulator.data import generate_dataset, Dataset
-from lending_simulator.decisions import compare_policies, sensitivity
-from lending_simulator.types import Assumptions
-from lending_simulator.ui.state import controls_for, parse_controls, draft_changes, stage_case
-from lending_simulator.ui.data import ScenarioSnapshot, compare_snapshots, profit_bridge, stress_frame
-from lending_simulator.ui.formatting import money, percent, points
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +36,7 @@ def result_bundle():
 
 
 def test_draft_round_trip_and_normalized_reversion_preserve_every_assumption():
-    applied = replace(Assumptions(), recovery_lag=7, initial_cash=D('1250000'),
+    applied = replace(Assumptions(), recovery_lag=7, initial_cash=D(1250000),
                       funding_rate=D('.125'), cash_floor=D(0))
     controls = controls_for(applied)
     assert parse_controls(controls) == applied
@@ -62,7 +72,7 @@ def test_staging_stress_uses_its_applied_basis_and_guards_existing_drafts():
 
 @pytest.mark.parametrize('value, expected', [
     (D('-.001'), '(<$1)'), (D('.001'), '<$1'), (D(0), '$0'),
-    (None, 'Unavailable'), (D('-1250'), '($1,250)'),
+    (None, 'Unavailable'), (D(-1250), '($1,250)'),
     (D('-0'), '$0'), (-0.0, '$0'),
 ])
 def test_money_preserves_small_nonzero_signs_and_missing_values(value, expected):

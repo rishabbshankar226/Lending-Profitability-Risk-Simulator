@@ -1,24 +1,49 @@
-"""Runtime Excel download using the XlsxWriter stack in the approved plan.
+"""Scenario workbook snapshots and independent financial benchmarks.
 
 The workbook is a saved scenario plus small independent formula benchmarks.
 It does not recalculate the whole portfolio when someone edits an input cell.
 The same inspectable workbook specification supports the authoring QA renderer.
 """
 
-from dataclasses import asdict, fields
+from collections.abc import Sequence
+from dataclasses import fields
 from decimal import Decimal
 from io import BytesIO
+from typing import TypedDict
 
 import xlsxwriter
 
-from lending_simulator.presentation import RATE_INPUTS, units_for, workbook_payload
-from lending_simulator.types import MonthlyResult, CohortMonth
+from lending_simulator.data import Dataset
+from lending_simulator.presentation import units_for, workbook_payload
+from lending_simulator.types import CohortMonth, ModelResult, MonthlyResult
 
 ACCOUNTING = '$#,##0.00;($#,##0.00);"-"'
 NUMBER = '#,##0.00;(#,##0.00);"-"'
 
+type WorkbookCell = str | int | float | bool | None
 
-def _number(value):
+
+class FormulaCell(TypedDict):
+    cell: str
+    formula: str
+    cached: int | float
+
+
+class WorkbookSheet(TypedDict):
+    name: str
+    rows: Sequence[Sequence[WorkbookCell]]
+    widths: dict[int, int]
+    formats: dict[str, str]
+    formulas: list[FormulaCell]
+    freeze: int
+
+
+class WorkbookSpec(TypedDict):
+    selected_run_id: str
+    sheets: list[WorkbookSheet]
+
+
+def _number(value: Decimal | WorkbookCell) -> WorkbookCell:
     if value is None:
         return "n.a."
     if isinstance(value, (Decimal, float, int)) and not isinstance(value, bool):
@@ -26,15 +51,19 @@ def _number(value):
     return value
 
 
-def _sheet(name, rows, widths=None, formats=None, formulas=None, freeze=0):
+def _sheet(
+    name: str, rows: Sequence[Sequence[WorkbookCell]], widths: dict[int, int] | None = None,
+    formats: dict[str, str] | None = None, formulas: list[FormulaCell] | None = None,
+    freeze: int = 0,
+) -> WorkbookSheet:
     return {"name": name, "rows": rows, "widths": widths or {}, "formats": formats or {},
             "formulas": formulas or [], "freeze": freeze}
 
 
-def workbook_spec(result, results, dataset) -> dict:
+def workbook_spec(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> WorkbookSpec:
     payload = workbook_payload(result, results, dataset)
     s = result.summary
-    summary_rows = [
+    summary_rows: list[list[WorkbookCell]] = [
         ["Lending scenario (USD)", None], ["Selected policy", result.policy.title()],
         ["Basis", "Synthetic expected-value projection, uncalibrated"],
         ["Operating result: first 24 months", _number(s.operating_result_24m)],
@@ -48,7 +77,7 @@ def workbook_spec(result, results, dataset) -> dict:
         ["Contribution / funded loan", _number(s.unit_contribution)],
         [], ["Workbook behavior", "Saved portfolio outputs; rerun the app to refresh. Benchmark cells recalculate independently."],
     ]
-    assumption_rows = [
+    assumption_rows: list[list[WorkbookCell]] = [
         ["Run manifest", "Selected scenario"], ["Run ID", result.run_id],
         ["Policy", result.policy], ["Dataset hash", dataset.dataset_hash],
         ["Model version", result.manifest()["model_version"]],
@@ -61,17 +90,17 @@ def workbook_spec(result, results, dataset) -> dict:
         assumption_rows.append([name, _number(getattr(result.assumptions, name)), row["Unit"], row["Classification"],
                                 row["Timing / definition"], row["Source"], row["Source date"]])
     monthly_fields = [f.name for f in fields(MonthlyResult)]
-    monthly_rows = [monthly_fields, [units_for(n) for n in monthly_fields]]
+    monthly_rows: list[list[WorkbookCell]] = [list(monthly_fields), [units_for(n) for n in monthly_fields]]
     monthly_rows += [[_number(getattr(row, n)) for n in monthly_fields] for row in result.monthly]
     cohort_fields = [f.name for f in fields(CohortMonth)]
-    cohort_rows = [cohort_fields, [units_for(n) for n in cohort_fields]]
+    cohort_rows: list[list[WorkbookCell]] = [list(cohort_fields), [units_for(n) for n in cohort_fields]]
     cohort_rows += [[_number(getattr(row, n)) for n in cohort_fields] for row in result.cohorts]
     comparison = payload["comparison"]
     policy_rows = [list(comparison[0])] + [list(row.values()) for row in comparison]
 
     # An independently computed float oracle supplies cached preview values.
     # Formula cells remain live and are recalculated during authoring QA.
-    loan_rows = [
+    loan_rows: list[list[WorkbookCell]] = [
         ["Independent amortization benchmark"], [], ["Original principal", 1200.0],
         ["Annual nominal interest rate", .12], ["Payments", 12],
         ["Monthly interest rate", None], [], ["Monthly payment", None],
@@ -80,7 +109,7 @@ def workbook_spec(result, results, dataset) -> dict:
     ]
     rate, principal, term = .12 / 12, 1200., 12
     payment = principal * rate / (1 - (1 + rate) ** -term)
-    loan_formulas = [
+    loan_formulas: list[FormulaCell] = [
         {"cell": "B6", "formula": "=B4/12", "cached": rate},
         {"cell": "B8", "formula": "=IF(B6=0,B3/B5,B3*B6/(1-(1+B6)^(-B5)))", "cached": payment},
     ]
@@ -104,14 +133,14 @@ def workbook_spec(result, results, dataset) -> dict:
         {"cell": "B25", "formula": "=SUM(D12:D23)", "cached": payment * 12 - 1200},
         {"cell": "B26", "formula": "=SUM(E12:E23)", "cached": 1200},
     ]
-    default_rows = [
+    default_rows: list[list[WorkbookCell]] = [
         ["Independent default and recovery benchmark"], [], ["Principal at origination", 900.],
         ["Default month", 1], ["Recovery fraction", .25], ["Recovery lag (months)", 3],
         ["Full-runoff net principal loss", None],
         ["Charge-off reduces the asset; the original advance was the cash outflow."], [], [],
         ["Month", "Opening principal", "Originations", "Charge-offs", "Recoveries", "Ending principal", "Net loss"],
     ]
-    default_formulas = [{"cell": "B7", "formula": "=B3*(1-B5)", "cached": 675}]
+    default_formulas: list[FormulaCell] = [{"cell": "B7", "formula": "=B3*(1-B5)", "cached": 675}]
     for month in range(5):
         r = month + 12
         opening = 900 if month == 1 else 0
@@ -129,7 +158,7 @@ def workbook_spec(result, results, dataset) -> dict:
             {"cell": f"G{r}", "formula": f"=D{r}-E{r}", "cached": charge - recovery},
         ]
 
-    check_rows = [["Financial reconciliation (USD)", "Maximum absolute difference", "Internal tolerance"],
+    check_rows: list[list[WorkbookCell]] = [["Financial reconciliation (USD)", "Maximum absolute difference", "Internal tolerance"],
                   ["Loan roll-forward", float(result.checks.loan_residual), float(result.checks.tolerance)],
                   ["Debt roll-forward", float(result.checks.debt_residual), float(result.checks.tolerance)],
                   ["Cash roll-forward", float(result.checks.cash_residual), float(result.checks.tolerance)],
@@ -155,14 +184,13 @@ def workbook_spec(result, results, dataset) -> dict:
     ]}
 
 
-def scenario_workbook(result, results, dataset) -> bytes:
+def scenario_workbook(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> bytes:
     spec = workbook_spec(result, results, dataset)
     output = BytesIO()
     with xlsxwriter.Workbook(output, {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False}) as book:
         normal = book.add_format({"font_name": "Arial", "font_size": 10, "valign": "vcenter"})
         header = book.add_format({"font_name": "Arial", "font_size": 10, "bold": True, "bg_color": "#243e54", "font_color": "white", "text_wrap": True, "valign": "vcenter"})
         formula = book.add_format({"font_name": "Arial", "font_size": 10, "num_format": ACCOUNTING})
-        editable = book.add_format({"font_name": "Arial", "font_size": 10, "font_color": "#1d4ed8", "bg_color": "#fff4cc", "num_format": NUMBER})
         for sheet in spec["sheets"]:
             ws = book.add_worksheet(sheet["name"])
             ws.hide_gridlines(2)

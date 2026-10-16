@@ -28,8 +28,8 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 VIEWS = ("Overview", "Policies", "Cohorts", "Funding & stress", "Methodology")
-BASE_RUN = "5a88f7bef3fa93d4"
-BALANCED_RUN = "a2feec5a72facbc3"
+BASE_RUN = "438a13c9e03c52a9"
+BALANCED_RUN = "70d251749e3b54d6"
 
 
 class Review:
@@ -217,7 +217,7 @@ def desktop_journey(r):
     expect(p.get_by_text("Unapplied changes · Results use the last successful scenario.", exact=True)).not_to_be_visible()
     r.check("Typed numeric edit commits when Run is clicked immediately")
     r.policy("Balanced")
-    assert r.applied_run() == "690e9fa563e2d475"
+    assert r.applied_run() == "89fea7fd94029201"
     assert r.metrics()[0:2] == ["$294,468", "$3,857"]
     r.capture("capital")
     r.check("More-capital recommendation and viewed run remain distinct")
@@ -238,7 +238,7 @@ def desktop_journey(r):
 
     r.expand("Compare with a pinned scenario")
     p.get_by_role("button", name="Pin applied scenario", exact=True).click()
-    expect(p.get_by_text(re.compile(r"Baseline runs: .*Balanced 690e9fa563e2d475"))).to_be_visible()
+    expect(p.get_by_text(re.compile(r"Baseline runs: .*Balanced 89fea7fd94029201"))).to_be_visible()
     r.ready()
     r.expand("Credit assumptions")
     lag = p.get_by_role("spinbutton", name="Recovery lag (months)", exact=True)
@@ -285,7 +285,7 @@ def desktop_journey(r):
     r.expand("One-click examples")
     p.get_by_role("button", name="Higher defaults · 2×", exact=True).click()
     expect(p.get_by_role("heading", name="No positive-profit recommendation", exact=True)).to_be_visible()
-    assert r.applied_run() == "a2d0056e84a3ceb8"
+    assert r.applied_run() == "153c7d2b57999d98"
     r.capture("higher-defaults")
     r.check("Loss-making example has no positive-profit recommendation")
 

@@ -1,11 +1,11 @@
 """Real HTTP readiness, separate from AppTest and real-browser verification."""
 
-from pathlib import Path
 import socket
 import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import pytest
 

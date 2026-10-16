@@ -1,29 +1,37 @@
 """Reproduce the same scenario bundle outside the dashboard."""
 
 import argparse
+import json
+import sys
+from collections.abc import Sequence
 from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
-import json
-import sys
 
 from lending_simulator.data import load_dataset
 from lending_simulator.decisions import compare_policies, select_strategy
 from lending_simulator.exports import scenario_workbook, workbook_spec
+from lending_simulator.json_input import load_assumptions_document
 from lending_simulator.presentation import csv_package
 from lending_simulator.types import Assumptions
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", type=Path, default=Path(__file__).resolve().parents[1] / "data" / "applications.csv")
+    default_dataset = Path(__file__).resolve().parent / "sample_data" / "applications.csv"
+    if not default_dataset.is_file():
+        default_dataset = Path(__file__).resolve().parents[1] / "data" / "applications.csv"
+    parser.add_argument("--dataset", type=Path, default=default_dataset)
     parser.add_argument("--assumptions", type=Path, help="Assumptions JSON or a downloaded manifest.json")
     parser.add_argument("--output", type=Path, default=Path("artifacts/base-case"))
     args = parser.parse_args(argv)
     try:
         dataset = load_dataset(args.dataset)
-        saved = json.loads(args.assumptions.read_text()) if args.assumptions else {}
-        assumptions = Assumptions.from_dict(saved.get("assumptions", saved))
+        saved = load_assumptions_document(args.assumptions) if args.assumptions else {}
+        supplied = saved.get("assumptions", saved)
+        if not isinstance(supplied, dict):
+            raise ValueError("Assumptions must be an object with string keys.")
+        assumptions = Assumptions.from_dict(supplied)
         if "dataset_hash" in saved and saved["dataset_hash"] != dataset.dataset_hash:
             raise ValueError("The manifest's dataset hash does not match the supplied CSV.")
         results = compare_policies(dataset, assumptions)

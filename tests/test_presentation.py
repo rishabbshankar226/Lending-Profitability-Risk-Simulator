@@ -1,20 +1,26 @@
 import csv
+import json
+import zipfile
 from dataclasses import replace
 from decimal import Decimal as D
 from io import BytesIO, StringIO
-import json
-import zipfile
 from pathlib import Path
 
-from openpyxl import load_workbook
 import pytest
+from openpyxl import load_workbook
 
 from lending_simulator.data import Dataset, generate_dataset, load_dataset
 from lending_simulator.decisions import compare_policies
-from lending_simulator.presentation import cohort_heatmap, csv_package, workbook_payload, monthly_frame, assumption_register
 from lending_simulator.exports import scenario_workbook
+from lending_simulator.presentation import (
+    assumption_register,
+    cohort_heatmap,
+    csv_package,
+    decision_brief,
+    monthly_frame,
+    workbook_payload,
+)
 from lending_simulator.types import Assumptions
-from lending_simulator.presentation import decision_brief
 
 
 @pytest.fixture(scope="module")
@@ -44,7 +50,7 @@ def test_limit_margins_preserve_exact_boundaries_and_percentage_point_units(
 
 @pytest.mark.parametrize("assumptions, policy, recommendation, explanation", [
     (Assumptions(), "balanced", "Conservative", "highest expected full-runoff"),
-    (replace(Assumptions(), initial_cash=D("1250000")), "balanced", "Balanced", "highest expected full-runoff"),
+    (replace(Assumptions(), initial_cash=D(1250000)), "balanced", "Balanced", "highest expected full-runoff"),
     (replace(Assumptions(), default_stress=D(2)), "conservative", "None", "No eligible strategy is profitable"),
     (replace(Assumptions(), initial_cash=D(0)), "conservative", "None", "No policy meets"),
 ])
@@ -74,7 +80,7 @@ def test_brief_reports_the_calculated_decision_and_exact_applied_inputs(
 @pytest.mark.parametrize("mismatch", ["selected", "comparison"])
 def test_brief_rejects_stale_selected_results_and_mixed_comparison(brief_dataset, mismatch):
     base = compare_policies(brief_dataset, Assumptions())
-    capital = compare_policies(brief_dataset, replace(Assumptions(), initial_cash=D("1250000")))
+    capital = compare_policies(brief_dataset, replace(Assumptions(), initial_cash=D(1250000)))
     selected, results = (base[1], capital) if mismatch == "selected" else (base[0], (base[0], capital[1], base[2]))
     with pytest.raises(ValueError):
         decision_brief(selected, results)
@@ -164,7 +170,7 @@ def test_changed_assumptions_export_a_new_scenario_without_mutating_original():
 
 
 def test_assumptions_table_serializes_to_the_dashboard_without_arrow_type_fixes():
-    import pyarrow as pa
     import pandas as pd
+    import pyarrow as pa
     table = pa.Table.from_pandas(pd.DataFrame(assumption_register(Assumptions())))
     assert table.num_rows == 19

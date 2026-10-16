@@ -1,12 +1,29 @@
 """Pure deterministic financial engine. No SQL, UI, network, or shared state."""
 
 from dataclasses import asdict
-from decimal import Decimal, localcontext
+from decimal import Decimal
+from typing import cast
 
 from lending_simulator import MODEL_VERSION
+from lending_simulator.numeric import (
+    CALCULATION_PRECISION,
+    cancellation_precision,
+    finite_decimal,
+    numeric_context,
+)
 from lending_simulator.types import (
-    BANDS, ORIGINATION_MONTHS, POLICIES, Assumptions, Checks, CohortInput,
-    CohortMonth, ModelResult, MonthlyResult, Summary, stable_hash, decimal_text,
+    BANDS,
+    ORIGINATION_MONTHS,
+    POLICIES,
+    Assumptions,
+    Checks,
+    CohortInput,
+    CohortMonth,
+    ModelResult,
+    MonthlyResult,
+    Summary,
+    decimal_text,
+    stable_hash,
 )
 
 D = Decimal
@@ -15,21 +32,44 @@ TOLERANCE = D("1e-16")  # Dollars; far tighter than the one-cent reporting requi
 
 
 def contractual_payment(principal: Decimal, annual_rate: Decimal, term: int) -> Decimal:
-    monthly_rate = annual_rate / 12
-    if monthly_rate == 0:
-        return principal / term
-    return principal * monthly_rate / (1 - (1 + monthly_rate) ** (-term))
+    principal = finite_decimal(principal, "Principal")
+    annual_rate = finite_decimal(annual_rate, "Annual rate")
+    if principal < 0 or not 0 <= annual_rate <= 1:
+        raise ValueError("Principal must be nonnegative and annual rate must be in [0, 1].")
+    _validate_term(term)
+    with numeric_context(cancellation_precision(annual_rate)):
+        monthly_rate = annual_rate / 12
+        value = principal / term if not monthly_rate else (
+            principal * monthly_rate / (1 - (1 + monthly_rate) ** (-term))
+        )
+    with numeric_context():
+        return +value
 
 
 def monthly_hazard(lifetime_pd: Decimal, term: int) -> Decimal:
+    lifetime_pd = finite_decimal(lifetime_pd, "Lifetime PD")
+    if not 0 <= lifetime_pd <= 1:
+        raise ValueError("Lifetime PD must be in [0, 1].")
+    _validate_term(term)
     if lifetime_pd == 0:
         return ZERO
     if lifetime_pd == 1:
         return D(1)
-    return 1 - (1 - lifetime_pd) ** (D(1) / term)
+    with numeric_context(cancellation_precision(lifetime_pd)):
+        value = 1 - (1 - lifetime_pd) ** (D(1) / term)
+    with numeric_context():
+        return +value
 
 
-def _validate_inputs(cohorts, assumptions, policy, expected_applications):
+def _validate_term(term: int) -> None:
+    if type(term) is not int or term <= 0:
+        raise ValueError("Term must be a positive integer number of months.")
+
+
+def _validate_inputs(
+    cohorts: tuple[CohortInput, ...], assumptions: Assumptions,
+    policy: str, expected_applications: Decimal,
+) -> None:
     assumptions.validate()
     if policy not in POLICIES:
         raise ValueError(f"Unknown policy: {policy}")
@@ -49,7 +89,11 @@ def _validate_inputs(cohorts, assumptions, policy, expected_applications):
             v = getattr(c, name)
             if not isinstance(v, Decimal) or not v.is_finite() or v <= 0:
                 raise ValueError(f"Cohort {name} must be a finite, positive Decimal.")
-    if sum((c.expected_count for c in cohorts), ZERO) > expected_applications + TOLERANCE:
+    # Count aggregation gets at most one ULP per term, in count units.
+    count_roundoff = (D(len(cohorts) + 1).scaleb(
+        expected_applications.adjusted() - CALCULATION_PRECISION + 1
+    ) if expected_applications else ZERO)
+    if sum((c.expected_count for c in cohorts), ZERO) > expected_applications + count_roundoff:
         raise ValueError("Funded loan count cannot exceed the application denominator.")
 
 
@@ -60,7 +104,7 @@ def _cohort_schedule(c: CohortInput, a: Assumptions) -> tuple[CohortMonth, ...]:
     survival = D(1)
     # Contractual balance of the entire original cohort in the absence of default.
     contractual_balance = c.principal
-    recoveries_due = {}
+    recoveries_due: dict[int, Decimal] = {}
     rows = [CohortMonth(
         c.origination_month, c.risk_band, c.origination_month, 0,
         originations=c.principal, ending_principal=c.principal,
@@ -109,19 +153,18 @@ def run_model(
     visible; the model never invents extra financing or stops costs early.
     """
     cohorts = tuple(cohorts)
-    with localcontext() as ctx:
-        ctx.prec = 34
+    with numeric_context():
         _validate_inputs(cohorts, assumptions, policy, expected_applications)
         a = assumptions
         horizon = ORIGINATION_MONTHS + a.term + a.recovery_lag
         cohort_rows = tuple(row for c in sorted(cohorts, key=lambda c: (c.origination_month, BANDS.index(c.risk_band)))
                             for row in _cohort_schedule(c, a))
-        by_month = [[] for _ in range(horizon)]
-        for row in cohort_rows:
-            by_month[row.month].append(row)
+        by_month: list[list[CohortMonth]] = [[] for _ in range(horizon)]
+        for cohort_row in cohort_rows:
+            by_month[cohort_row.month].append(cohort_row)
         carry_principal = carry_debt = cumulative_result = ZERO
         cash = a.initial_cash
-        monthly = []
+        monthly: list[MonthlyResult] = []
         residuals = {name: ZERO for name in ("loan", "debt", "cash", "equity", "cohort")}
         exposure_limits_ok = True
         aggregate_fields = (
@@ -170,8 +213,8 @@ def run_model(
             exposure_limits_ok &= 0 <= debt <= a.facility_limit and debt <= a.advance_rate * row.ending_principal + TOLERANCE
             cash, carry_principal, carry_debt = closing_cash, row.ending_principal, debt
 
-        def total(name):
-            return sum((getattr(row, name) for row in monthly), ZERO)
+        def total(name: str) -> Decimal:
+            return sum((cast(Decimal, getattr(row, name)) for row in monthly), ZERO)
 
         funded = total("funded_loans")
         principal = total("originations")
@@ -190,7 +233,7 @@ def run_model(
         )
         summary = Summary(
             expected_applications=expected_applications, funded_loans=funded,
-            approval_rate=funded / expected_applications if expected_applications else None,
+            approval_rate=min(D(1), funded / expected_applications) if expected_applications else None,
             funded_principal=principal, interest_revenue=total("interest_revenue"),
             merchant_fees=total("merchant_fees"), gross_chargeoffs=total("gross_chargeoffs"),
             recoveries=total("recoveries"), net_credit_loss=net_loss,

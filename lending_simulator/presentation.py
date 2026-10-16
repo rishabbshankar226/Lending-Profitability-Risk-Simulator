@@ -1,26 +1,59 @@
 """Convert one result bundle into chart data and reproducible exports."""
 
 import csv
-from dataclasses import asdict, fields
-from datetime import date
-from decimal import Decimal, localcontext
-from io import BytesIO, StringIO
-from importlib.resources import files
 import json
 import zipfile
+from dataclasses import asdict, fields
+from datetime import date
+from decimal import Decimal
+from importlib.resources import files
+from io import BytesIO, StringIO
+from typing import TypedDict, cast
 
 import pandas as pd
 
 from lending_simulator.data import Dataset
 from lending_simulator.decisions import evaluate_policy, select_strategy
 from lending_simulator.formatting import percent
-from lending_simulator.types import Assumptions, ModelResult, MonthlyResult, CohortMonth, Summary
+from lending_simulator.numeric import isolated, numeric_context
+from lending_simulator.types import (
+    Assumptions,
+    CohortMonth,
+    ModelResult,
+    MonthlyResult,
+    Summary,
+)
 
 COUNT_FIELDS = {"expected_active", "expected_defaults", "funded_loans", "expected_applications"}
 RATIO_FIELDS = {"approval_rate", "loss_ratio"}
 INDEX_FIELDS = {"month", "age", "origination_month", "minimum_cash_month"}
 RATE_INPUTS = {"borrower_rate", "merchant_fee", "pd_low", "pd_medium", "pd_high", "recovery_rate",
                "funding_rate", "advance_rate", "demand_growth", "loss_cap"}
+
+type ExportRecord = dict[str, str | int | bool | None]
+type DisplayRecord = dict[str, str | int | float | bool | None]
+
+
+class EvidenceSource(TypedDict):
+    publisher: str
+    url: str
+    suitability: str
+
+
+class EvidenceRegister(TypedDict):
+    decision: str
+    sources: list[EvidenceSource]
+
+
+class WorkbookPayload(TypedDict):
+    selected_run_id: str
+    manifest: dict[str, object]
+    summary: ExportRecord
+    monthly: list[ExportRecord]
+    cohorts: list[ExportRecord]
+    assumptions: list[dict[str, str]]
+    comparison: list[DisplayRecord]
+    sources: EvidenceRegister
 
 
 def month_label(month: int) -> str:
@@ -30,8 +63,7 @@ def month_label(month: int) -> str:
 
 def limit_margins(result: ModelResult) -> tuple[Decimal, Decimal | None]:
     """Cash in USD and loss in percentage points; negative margins breach a limit."""
-    with localcontext() as ctx:
-        ctx.prec = 34
+    with numeric_context():
         cash = result.summary.minimum_cash - result.assumptions.cash_floor
         loss = (None if result.summary.loss_ratio is None else
                 (result.assumptions.loss_cap - result.summary.loss_ratio) * 100)
@@ -64,6 +96,7 @@ def comparison_frame(results: tuple[ModelResult, ...]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@isolated
 def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str:
     """A shareable decision and its reproducible inputs from one applied bundle."""
     if result not in results:
@@ -71,7 +104,7 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
     decision = select_strategy(results)
     a, manifest = result.assumptions, result.manifest()
 
-    def amount(value):
+    def amount(value: Decimal) -> str:
         return f"({abs(value):,.0f})" if value < 0 else f"{value:,.0f}"
 
     recommendation = decision.recommended_policy.title() if decision.recommended_policy else "None"
@@ -81,11 +114,11 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
         "## Decision", "",
         f"**Recommended policy: {recommendation}.** {decision.message}", "",
         f"Selected portfolio: **{result.policy.title()}**. This is the displayed portfolio; the recommendation compares all policies below.", "",
-        f"Horizon: **{len(result.monthly)} months**, {month_label(0)} through {month_label(len(result.monthly) - 1)}, "
-        f"including {manifest['operating_horizon_months']} months of originations and complete repayment/recovery runoff.", "",
+        (f"Horizon: **{len(result.monthly)} months**, {month_label(0)} through {month_label(len(result.monthly) - 1)}, "
+        f"including {manifest['operating_horizon_months']} months of originations and complete repayment/recovery runoff."), "",
         "## Applied assumptions", "",
-        f"Starting equity: **USD {amount(a.initial_cash)}**. Facility limit: **USD {amount(a.facility_limit)}**. "
-        f"Funding rate: **{percent(a.funding_rate)}** annually. Lifetime default stress: **{a.default_stress.normalize():f}×**.", "",
+        (f"Starting equity: **USD {amount(a.initial_cash)}**. Facility limit: **USD {amount(a.facility_limit)}**. "
+        f"Funding rate: **{percent(a.funding_rate)}** annually. Lifetime default stress: **{a.default_stress.normalize():f}×**."), "",
         f"Net principal loss cap: **{percent(a.loss_cap)}**. Month-end cash floor: **USD {amount(a.cash_floor)}**.", "",
         "## Policy tradeoffs", "",
         "Amounts are USD, rounded to whole dollars; parentheses denote negative values. Operating profit and net loss cover complete runoff.", "",
@@ -100,14 +133,14 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
                      f"{loss} | {amount(s.minimum_cash)} | {amount(s.additional_equity_required)} | {reason} |")
     lines.extend([
         "", "Eligibility tests the credit-loss cap, cash floor and financial reconciliations. A recommendation also requires positive operating profit.", "",
-        "Negative cash is an unfunded diagnostic path. Extra equity is the additional starting cash needed to meet the floor, "
-        "not committed funding; the model does not charge a cost of equity.", "",
+        ("Negative cash is an unfunded diagnostic path. Extra equity is the additional starting cash needed to meet the floor, "
+        "not committed funding; the model does not charge a cost of equity."), "",
         "## Scope and reproducibility", "",
-        "This simplified management forecast excludes taxes, prepayment, delinquency stages, price response and intramonth liquidity. "
-        "It does not establish actual lender performance or borrower prediction accuracy.", "",
+        ("This simplified management forecast excludes taxes, prepayment, delinquency stages, price response and intramonth liquidity. "
+        "It does not establish actual lender performance or borrower prediction accuracy."), "",
         f"Selected run: `{result.run_id}`. Model version: `{manifest['model_version']}`.", "",
-        "All applied inputs, checks, dataset identity and policy run IDs are recorded below. Exact financial schedules are in the CSV package. "
-        "Save this JSON as `manifest.json` and run `python -m lending_simulator.cli --assumptions manifest.json` with the matching dataset to reproduce the calculations.", "",
+        ("All applied inputs, checks, dataset identity and policy run IDs are recorded below. Exact financial schedules are in the CSV package. "
+        "Save this JSON as `manifest.json` and run `python -m lending_simulator.cli --assumptions manifest.json` with the matching dataset to reproduce the calculations."), "",
         "```json", json.dumps(manifest | {"decision": asdict(decision),
                                          "comparison_run_ids": {r.policy: r.run_id for r in results}}, indent=2),
         "```", "",
@@ -115,6 +148,7 @@ def decision_brief(result: ModelResult, results: tuple[ModelResult, ...]) -> str
     return "\n".join(lines)
 
 
+@isolated
 def cohort_heatmap(result: ModelResult, as_of_month: int | None = None) -> pd.DataFrame:
     """Cumulative net principal loss / original principal, at matching loan ages.
 
@@ -125,7 +159,7 @@ def cohort_heatmap(result: ModelResult, as_of_month: int | None = None) -> pd.Da
         as_of_month = len(result.monthly) - 1
     term = result.assumptions.term + result.assumptions.recovery_lag
     frame = pd.DataFrame(float("nan"), index=range(24), columns=range(term + 1))
-    cohorts = {}
+    cohorts: dict[int, list[CohortMonth]] = {}
     for row in result.cohorts:
         key = row.origination_month
         cohorts.setdefault(key, []).append(row)
@@ -141,6 +175,7 @@ def cohort_heatmap(result: ModelResult, as_of_month: int | None = None) -> pd.Da
     return frame
 
 
+@isolated
 def band_curves(result: ModelResult) -> pd.DataFrame:
     rows = []
     for band in ("low", "medium", "high"):
@@ -165,7 +200,7 @@ def units_for(name: str) -> str:
         return "expected loan/application count; may be fractional"
     if name in RATIO_FIELDS:
         return "ratio, 0-1; full-runoff denominator unless specified"
-    if name.startswith("opening_") or name.startswith("ending_") or name in ("minimum_cash", "peak_debt", "minimum_facility_headroom"):
+    if name.startswith(("opening_", "ending_")) or name in ("minimum_cash", "peak_debt", "minimum_facility_headroom"):
         return "USD, month-end balance" if not name.startswith("opening_") else "USD, opening balance"
     if name == "risk_band":
         return "illustrative risk category"
@@ -174,11 +209,11 @@ def units_for(name: str) -> str:
     return "USD, monthly flow" if name not in ("additional_equity_required",) else "USD, additional starting equity to meet cash floor"
 
 
-def _record(obj):
+def _record(obj: MonthlyResult | CohortMonth | Summary) -> ExportRecord:
     return {k: str(v) if isinstance(v, Decimal) else v for k, v in asdict(obj).items()}
 
 
-def _csv(records: list[dict], fieldnames: list[str]) -> str:
+def _csv(records: list[ExportRecord], fieldnames: list[str]) -> str:
     stream = StringIO(newline="")
     writer = csv.DictWriter(stream, fieldnames=fieldnames, lineterminator="\n")
     writer.writeheader()
@@ -210,11 +245,13 @@ def csv_package(result: ModelResult, dataset: Dataset) -> bytes:
     return buffer.getvalue()
 
 
-def evidence_register() -> dict:
-    return json.loads(files("lending_simulator").joinpath("evidence", "sources.json").read_text())
+def evidence_register() -> EvidenceRegister:
+    return cast(EvidenceRegister, json.loads(
+        files("lending_simulator").joinpath("evidence", "sources.json").read_text()
+    ))
 
 
-def assumption_register(assumptions: Assumptions) -> list[dict]:
+def assumption_register(assumptions: Assumptions) -> list[dict[str, str]]:
     rows = []
     timing = {
         "borrower_rate": "monthly nominal rate = annual / 12; payments start after origination",
@@ -239,10 +276,11 @@ def assumption_register(assumptions: Assumptions) -> list[dict]:
     return rows
 
 
-def workbook_payload(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> dict:
+def workbook_payload(result: ModelResult, results: tuple[ModelResult, ...], dataset: Dataset) -> WorkbookPayload:
     if result.dataset_hash != dataset.dataset_hash or result not in results:
         raise ValueError("Workbook must contain the selected scenario's results and dataset.")
     return {"selected_run_id": result.run_id, "manifest": result.manifest() | {"dataset": dataset.manifest()},
             "summary": _record(result.summary), "monthly": [_record(r) for r in result.monthly],
             "cohorts": [_record(r) for r in result.cohorts], "assumptions": assumption_register(result.assumptions),
-            "comparison": comparison_frame(results).to_dict(orient="records"), "sources": evidence_register()}
+            "comparison": cast(list[DisplayRecord], comparison_frame(results).to_dict(orient="records")),
+            "sources": evidence_register()}

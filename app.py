@@ -1,33 +1,42 @@
 """Lending workbench. Applied financial results are immutable until an explicit run."""
 
+import json
+from collections.abc import Mapping
 from dataclasses import replace
 from decimal import Decimal as D
 from hashlib import sha256
 from pathlib import Path
-import json
+from typing import cast
 
 import pandas as pd
 import streamlit as st
 
 from lending_simulator import MODEL_VERSION
-from lending_simulator.data import DEFAULT_SEED, load_dataset
+from lending_simulator.data import DEFAULT_SEED, Dataset, load_dataset
 from lending_simulator.decisions import compare_policies, select_strategy, sensitivity
 from lending_simulator.presentation import assumption_register
-from lending_simulator.types import Assumptions, POLICIES
+from lending_simulator.types import POLICIES, AssumptionOverrides, Assumptions, ModelResult, StressPoint
 from lending_simulator.ui.components import caption, decision_summary, readable_table
 from lending_simulator.ui.data import ScenarioSnapshot
 from lending_simulator.ui.downloads import download_factory
-from lending_simulator.ui.formatting import money, percent, multiple, assumption_value
-from lending_simulator.ui.state import FIELDS, controls_for, parse_controls, draft_changes, stage_case
+from lending_simulator.ui.formatting import assumption_value, money, multiple, percent
+from lending_simulator.ui.state import (
+    FIELDS,
+    StressRun,
+    controls_for,
+    draft_changes,
+    parse_controls,
+    stage_case,
+)
 from lending_simulator.ui.theme import apply_styles
-from lending_simulator.ui.views import ViewContext, render
+from lending_simulator.ui.views import ViewActions, ViewContext, render
 
 ROOT = Path(__file__).resolve().parent
 VIEWS = ("Overview", "Policies", "Cohorts", "Funding & stress", "Methodology")
 
 
 @st.cache_data(max_entries=2, show_spinner=False)
-def get_dataset(csv_hash, manifest_hash, dataset_version):
+def get_dataset(csv_hash: str, manifest_hash: str, dataset_version: str) -> Dataset:
     dataset = load_dataset(ROOT / "data" / "applications.csv", DEFAULT_SEED)
     manifest = json.loads((ROOT / "data" / "manifest.json").read_text())
     if (dataset.version != dataset_version or not isinstance(manifest, dict)
@@ -37,25 +46,29 @@ def get_dataset(csv_hash, manifest_hash, dataset_version):
 
 
 @st.cache_data(max_entries=8, show_spinner=False)
-def cached_results(assumption_json, dataset_hash, dataset_version, model_version, _dataset):
+def cached_results(
+    assumption_json: str, dataset_hash: str, dataset_version: str, model_version: str, _dataset: Dataset,
+) -> tuple[ModelResult, ...]:
     if _dataset.dataset_hash != dataset_hash or _dataset.version != dataset_version or model_version != MODEL_VERSION:
         raise ValueError("Scenario cache identity does not match its inputs.")
     return compare_policies(_dataset, Assumptions.from_dict(json.loads(assumption_json)))
 
 
 @st.cache_data(max_entries=3, show_spinner=False)
-def cached_sensitivity(assumption_json, dataset_hash, policy, model_version, _dataset):
+def cached_sensitivity(
+    assumption_json: str, dataset_hash: str, policy: str, model_version: str, _dataset: Dataset,
+) -> tuple[StressPoint, ...]:
     if _dataset.dataset_hash != dataset_hash or model_version != MODEL_VERSION:
         raise ValueError("Stress cache identity does not match its inputs.")
     return sensitivity(_dataset, Assumptions.from_dict(json.loads(assumption_json)), policy)
 
 
-def clear_stress():
+def clear_stress() -> None:
     for key in ("stress_points", "stress_case", "stress_case_view", "stress_metric", "stress_metric_view"):
         st.session_state.pop(key, None)
 
 
-def apply_scenario(a, policy, dataset, *, replace_draft=True):
+def apply_scenario(a: Assumptions, policy: str, dataset: Dataset, *, replace_draft: bool = True) -> None:
     results = cached_results(json.dumps(a.to_dict(), sort_keys=True), dataset.dataset_hash,
                              dataset.version, MODEL_VERSION, dataset)
     # Check the complete bundle before publishing the transaction.
@@ -69,24 +82,24 @@ def apply_scenario(a, policy, dataset, *, replace_draft=True):
     st.session_state.pop("scenario_error", None)
 
 
-def set_controls(controls):
+def set_controls(controls: Mapping[str, object]) -> None:
     st.session_state.draft_controls = dict(controls)
     for key, value in controls.items():
         st.session_state[key] = value
 
 
-def sync_draft():
+def sync_draft() -> None:
     old = st.session_state.draft_controls
     st.session_state.draft_controls = {key: st.session_state.get(key, old[key]) for _, key, _, _ in FIELDS}
     st.session_state.pop("scenario_error", None)
 
 
-def restore_applied():
+def restore_applied() -> None:
     set_controls(controls_for(st.session_state.applied_assumptions))
     st.session_state.pop("scenario_error", None)
 
 
-def load_example(overrides, policy="conservative", reset=False):
+def load_example(overrides: AssumptionOverrides, policy: str = "conservative", reset: bool = False) -> None:
     set_controls(controls_for(replace(Assumptions(), **overrides)))
     st.session_state.update(policy=policy, requested_policy=policy, apply_requested=True,
                             cohort_view="First 24 months", cohort_cutoff="First 24 months")
@@ -97,11 +110,11 @@ def load_example(overrides, policy="conservative", reset=False):
         st.session_state.pop("baseline", None)
 
 
-def reset_scenario():
+def reset_scenario() -> None:
     load_example({}, reset=True)
 
 
-def view_policy(policy):
+def view_policy(policy: str) -> None:
     if policy not in POLICIES:
         raise ValueError("Unknown viewed policy.")
     if st.session_state.applied_policy != policy:
@@ -109,39 +122,40 @@ def view_policy(policy):
     st.session_state.update(policy=policy, applied_policy=policy)
 
 
-def sync_policy():
+def sync_policy() -> None:
     view_policy(st.session_state.policy)
 
 
-def navigate(view):
+def navigate(view: str) -> None:
     st.session_state.update(active_view=view, analysis_view=view)
 
 
-def sync_navigation():
+def sync_navigation() -> None:
     st.session_state.active_view = st.session_state.analysis_view
 
 
-def inspect_credit():
+def inspect_credit() -> None:
     st.session_state.credit_editor = True
 
 
-def sync_cohort():
+def sync_cohort() -> None:
     st.session_state.cohort_view = st.session_state.cohort_cutoff
 
 
-def pin_baseline():
+def pin_baseline() -> None:
     st.session_state.baseline = ScenarioSnapshot.capture(st.session_state.results)
 
 
-def clear_baseline():
+def clear_baseline() -> None:
     st.session_state.pop("baseline", None)
 
 
-def current_result():
-    return next(r for r in st.session_state.results if r.policy == st.session_state.applied_policy)
+def current_result() -> ModelResult:
+    results = cast(tuple[ModelResult, ...], st.session_state.results)
+    return next(r for r in results if r.policy == st.session_state.applied_policy)
 
 
-def run_stress():
+def run_stress() -> None:
     r = current_result()
     with st.spinner("Calculating 20 selected-policy stress cases…"):
         points = cached_sensitivity(json.dumps(r.assumptions.to_dict(), sort_keys=True),
@@ -151,16 +165,16 @@ def run_stress():
         st.session_state.pop(key, None)
 
 
-def sync_stress_case():
+def sync_stress_case() -> None:
     st.session_state.stress_case_view = st.session_state.stress_case
 
 
-def sync_stress_metric():
+def sync_stress_metric() -> None:
     st.session_state.stress_metric_view = st.session_state.stress_metric
 
 
-def stage_stress():
-    saved = st.session_state.get("stress_points")
+def stage_stress() -> None:
+    saved = cast(StressRun | None, st.session_state.get("stress_points"))
     try:
         if not saved or saved["run_id"] != current_result().run_id:
             raise ValueError("Run a stress grid for this applied policy before staging a case.")
@@ -170,7 +184,7 @@ def stage_stress():
         st.session_state.scenario_error = str(error)
 
 
-st.set_page_config(page_title="Lending Profitability & Risk Simulator", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Lending Profitability & Risk Simulator", layout="wide")
 apply_styles()
 st.title("Lending workbench")
 caption("Compare lending policies under cash and credit limits. Synthetic, illustrative, uncalibrated projections · USD.")
@@ -188,7 +202,7 @@ s.setdefault("policy", "conservative")
 s.setdefault("active_view", "Overview")
 s.setdefault("analysis_view", s.active_view)
 s.setdefault("cohort_view", "First 24 months")
-for _, key, _, _ in FIELDS:
+for _field_name, key, _field_label, _field_scale in FIELDS:
     s.setdefault(key, s.draft_controls[key])
 apply_requested = s.pop("apply_requested", False)
 if "results" not in s or apply_requested:
@@ -213,7 +227,7 @@ with st.sidebar:
         st.button("Higher defaults · 2×", key="example_defaults", on_click=load_example,
                   args=({"default_stress": D(2)},), width="stretch")
     st.slider("Monthly application growth (%)", -10.0, 10.0, step=.5, key="growth_percent",
-              on_change=sync_draft, help="Weights the fixed population, without changing risk mix or prices.")
+              on_change=sync_draft, help="Weights fixed application rows by month; supplied risk assumptions and prices stay fixed.")
     st.slider("Lifetime default stress (×)", 0.0, 5.0, step=.25, key="stress", on_change=sync_draft)
     st.slider("Annual funding rate (%)", 0.0, 30.0, step=.5, key="funding_percent", on_change=sync_draft)
     st.number_input("Starting equity cash ($)", step=50000.0, key="initial_cash", on_change=sync_draft)
@@ -305,7 +319,7 @@ with st.container(horizontal=True, wrap=True, vertical_alignment="center", key="
 st.segmented_control("Analysis", VIEWS, required=True, key="analysis_view",
                      on_change=sync_navigation, wrap=True, width="stretch", label_visibility="collapsed")
 decision_summary(selected, decision, view_policy)
-actions = {"view":view_policy,"navigate":navigate,"credit":inspect_credit,"cohort":sync_cohort,
+actions: ViewActions = {"view":view_policy,"navigate":navigate,"credit":inspect_credit,"cohort":sync_cohort,
            "pin":pin_baseline,"clear_baseline":clear_baseline,"stress":run_stress,
            "stress_case":sync_stress_case,"stress_metric":sync_stress_metric,"stage":stage_stress}
 render(s.active_view, ViewContext(selected, s.results, dataset, decision, actions))

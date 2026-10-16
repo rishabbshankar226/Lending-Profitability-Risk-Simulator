@@ -1,18 +1,18 @@
-from streamlit.testing.v1 import AppTest
-from pathlib import Path
+import json
+import re
+import shutil
 from dataclasses import replace
 from decimal import Decimal
-import json
-import shutil
-import re
 from html import unescape
+from pathlib import Path
 
 import pytest
 import streamlit as st
+from streamlit.testing.v1 import AppTest
 
-from lending_simulator.types import Assumptions
 from lending_simulator.data import Dataset, load_dataset, save_dataset
 from lending_simulator.decisions import select_strategy
+from lending_simulator.types import Assumptions
 
 
 def app():
@@ -81,7 +81,7 @@ def test_viewing_ineligible_policy_keeps_recommendation_and_identifies_cash_shor
     ]
     assert any("Charts and downloads use the viewed applied policy" in text for text in caption_text(page))
     assert page.session_state["applied_policy"] == "balanced"
-    assert page.session_state["results"][1].run_id == "a2feec5a72facbc3"
+    assert page.session_state["results"][1].run_id == "70d251749e3b54d6"
 
 
 @pytest.mark.parametrize("overrides, explanation, diagnostic", [
@@ -190,11 +190,11 @@ def test_decision_brief_follows_applied_examples_and_retains_last_valid_run():
 
     base = preview()
     assert "Recommended policy: Conservative" in base
-    assert '"run_id": "5a88f7bef3fa93d4"' in base
+    assert '"run_id": "438a13c9e03c52a9"' in base
     page.button(key="example_capital").click().run()
     capital = preview()
     assert "Recommended policy: Balanced" in capital
-    assert '"run_id": "690e9fa563e2d475"' in capital
+    assert '"run_id": "89fea7fd94029201"' in capital
     page.number_input(key="cash_floor").set_value(-1.0)
     assert preview() == capital
     page.button(key="run_scenario").click().run()
@@ -268,11 +268,11 @@ def test_bad_input_is_reported_and_last_successful_results_remain_visible():
 
 
 @pytest.mark.parametrize("example, assumptions, policy, run_id, profit, recommendation", [
-    ("base", Assumptions(), "conservative", "5a88f7bef3fa93d4", "$48,133", "conservative"),
+    ("base", Assumptions(), "conservative", "438a13c9e03c52a9", "$48,133", "conservative"),
     ("capital", replace(Assumptions(), initial_cash=1250000), "balanced",
-     "690e9fa563e2d475", "$294,468", "balanced"),
+     "89fea7fd94029201", "$294,468", "balanced"),
     ("defaults", replace(Assumptions(), default_stress=2), "conservative",
-     "a2d0056e84a3ceb8", "($11,563)", None),
+     "153c7d2b57999d98", "($11,563)", None),
 ])
 def test_guided_example_replaces_custom_and_draft_inputs_and_clears_stress(
         example, assumptions, policy, run_id, profit, recommendation):
@@ -329,7 +329,7 @@ def test_custom_run_after_example_keeps_edits_and_other_visitors_independent():
     assert other.session_state["applied_policy"] == "conservative"
     page.button(key="reset").click().run()
     assert page.session_state["applied_assumptions"] == Assumptions()
-    assert page.session_state["results"][0].run_id == "5a88f7bef3fa93d4"
+    assert page.session_state["results"][0].run_id == "438a13c9e03c52a9"
 
 
 def test_stress_grid_matches_current_applied_policy_and_resets_with_scenario():

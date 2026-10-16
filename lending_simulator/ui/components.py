@@ -1,27 +1,30 @@
 """Compact analytical components using native controls and semantic owned markup."""
 
+from collections.abc import Callable
 from html import escape
 
+import pandas as pd
 import streamlit as st
 
-from lending_simulator.decisions import evaluate_policy
+from lending_simulator.decisions import Decision, evaluate_policy
 from lending_simulator.presentation import limit_margins, month_label
+from lending_simulator.types import ModelResult
 from lending_simulator.ui.formatting import money, percent, points
 from lending_simulator.ui.theme import MUTED
 
 
-def caption(text):
+def caption(text: str) -> None:
     st.html(f'<p class="workbench-caption">{escape(text)}</p>')
 
 
-def readable_table(frame):
+def readable_table(frame: pd.DataFrame) -> None:
     """Keep native table behavior with opaque, readable row/column headers."""
     st.table(frame.style.set_table_styles([
         {'selector': 'th', 'props': [('color', MUTED), ('font-weight', '600')]},
     ]))
 
 
-def status(result):
+def status(result: ModelResult) -> tuple[str, str]:
     limits = evaluate_policy(result)
     profit = result.summary.operating_result
     profitability = 'Profitable' if profit > 0 else 'Loss-making' if profit < 0 else 'Breakeven'
@@ -31,11 +34,11 @@ def status(result):
     return f'{reason} · {profitability}', 'good' if limits.eligible and profit > 0 else 'warn'
 
 
-def status_chip(text, tone='warn'):
+def status_chip(text: str, tone: str = 'warn') -> None:
     st.html(f'<span class="workbench-status {escape(tone)}">{escape(text)}</span>')
 
 
-def decision_summary(result, decision, on_view_recommended):
+def decision_summary(result: ModelResult, decision: Decision, on_view_recommended: Callable[[str], None]) -> None:
     with st.container(border=True, key='decision_summary'):
         recommendation, viewing = st.columns([2, 1], vertical_alignment='center')
         with recommendation:
@@ -76,9 +79,9 @@ def decision_summary(result, decision, on_view_recommended):
     caption('USD, rounded · pp = percentage points. Status uses unrounded values. Charts and downloads use the viewed applied policy.')
 
 
-def policy_summary(results, recommended, viewed):
+def policy_summary(results: tuple[ModelResult, ...], recommended: str | None, viewed: str) -> None:
     """The same fields in a desktop table and narrow-screen definition lists."""
-    fields = (
+    fields: tuple[tuple[str, Callable[[ModelResult], str]], ...] = (
         ('Approval rate', lambda r: percent(r.summary.approval_rate)),
         ('Operating profit', lambda r: money(r.summary.operating_result)),
         ('Minimum cash', lambda r: money(r.summary.minimum_cash)),
@@ -86,7 +89,7 @@ def policy_summary(results, recommended, viewed):
         ('Equity for cash floor', lambda r: money(r.summary.additional_equity_required)),
         ('Limit / profit status', lambda r: status(r)[0]),
     )
-    def marker(r):
+    def marker(r: ModelResult) -> str:
         return ' · '.join(label for label, matches in (
             ('Recommended', r.policy == recommended), ('Viewing', r.policy == viewed)) if matches)
 

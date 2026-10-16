@@ -1,12 +1,14 @@
 """Useful SQLite aggregations; a private short-lived database for each call."""
 
-from contextlib import contextmanager
-from decimal import Decimal, localcontext
-from importlib.resources import files
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from decimal import Decimal
+from importlib.resources import files
 
 from lending_simulator.data import Dataset
-from lending_simulator.types import CohortInput, POLICIES
+from lending_simulator.numeric import numeric_context
+from lending_simulator.types import POLICIES, CohortInput
 
 D = Decimal
 
@@ -18,7 +20,7 @@ def query_text(name: str) -> str:
 
 
 @contextmanager
-def _database(dataset: Dataset):
+def _database(dataset: Dataset) -> Iterator[sqlite3.Connection]:
     dataset.validate()
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
@@ -43,7 +45,7 @@ def _database(dataset: Dataset):
         db.close()
 
 
-def policy_population(dataset: Dataset) -> tuple[dict, ...]:
+def policy_population(dataset: Dataset) -> tuple[dict[str, object], ...]:
     """Raw base counts, without projected demand weights."""
     with _database(dataset) as db:
         return tuple(dict(row) for row in db.execute(query_text("policy_population")))
@@ -57,8 +59,7 @@ def aggregate_for_model(dataset: Dataset, policy: str, growth: Decimal) -> tuple
     with _database(dataset) as db:
         approved = tuple(db.execute(query_text("cohort_inputs"), {"policy": policy}))
         demand = tuple(db.execute("SELECT month, COUNT(*) AS n FROM applications GROUP BY month"))
-    with localcontext() as ctx:
-        ctx.prec = 34
+    with numeric_context():
         weights = {month: (1 + growth) ** month for month in range(24)}
         cohorts = tuple(CohortInput(r["month"], r["risk_band"], D(r["application_count"]) * weights[r["month"]],
                                    D(r["principal_cents"]) / 100 * weights[r["month"]]) for r in approved)
