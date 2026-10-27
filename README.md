@@ -1,5 +1,35 @@
 # Lending Profitability and Risk Simulator
 
+[![Open the live Streamlit app](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://rishabb-lending-simulator.streamlit.app/)
+[![Checks](https://github.com/rishabbshankar226/Lending-Profitability-Risk-Simulator/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/rishabbshankar226/Lending-Profitability-Risk-Simulator/actions/workflows/checks.yml)
+
+**[Open the live app: rishabb-lending-simulator.streamlit.app](https://rishabb-lending-simulator.streamlit.app/)**
+
+The app is public and needs no sign-in or upload. The Streamlit Community Cloud
+host sleeps when idle, so the first load can take several seconds. It opens on
+the base case: Conservative, $48,133 full-runoff operating result, 0.84% net
+principal loss and $147,450 lowest month-end cash. These match the
+[policy table](#cli-and-input-contracts) below. On the hosted build, **More capital · $1.25m**
+makes Balanced the recommendation ($294,468 operating result, $53,857 lowest
+month-end cash); **Higher defaults · 2×** loads a stress case.
+
+> **Which build is hosted.** On October 26, 2026 the live app was still serving
+> the earlier `feature/lending-simulator` build, not `main`. Its Conservative
+> base run is `5a88f7bef3fa93d4`; `main` produces `438a13c9e03c52a9`, and run IDs
+> include the model version. The displayed base-case figures match, but the
+> interface differs (the hosted *Strategy comparison* tab is *Policies* on
+> `main`). Moving the host to `main` is a separate release action; see the
+> [hosted deployment notes](docs/deployment.md).
+
+**Start here:** [Two-minute reviewer guide](docs/reviewer-guide.md) ·
+[Business memo](docs/business-memo.md) ·
+[90-second captioned tour](docs/tour/README.md) (earlier hosted build)
+
+![Finance workbench overview on main](docs/screenshots/workbench/desktop-1440-overview.png)
+
+*The finance workbench on `main`, captured in Chromium at workbench revision
+`ba68ea3`, before the model 0.1.1 numerical audit. The headline figures are unchanged.*
+
 A deterministic expected-value model for a lender retaining 12-month installment
 loans. It compares three approval policies under credit-loss, collateral,
 facility and month-end cash constraints. Python calculates the financial results;
@@ -9,11 +39,32 @@ The application uses 10,000 fictional applications and illustrative risk/cost
 assumptions. It has no borrower scoring or historical calibration. Results are
 conditional projections, not evidence of actual lender performance.
 
-The audit repairs numerical, input-boundary and installed-package defects.
-Full strict typing, linting and the 200-test suite pass locally and in CI; these checks
-are now required in CI. The [audit ledger](docs/AUDIT_2026-10-15.md) records
-revision-specific CI/browser results and the
-[approved development-tooling record](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
+## What the app does
+
+- **Overview, Policies, Cohorts, Funding & stress, Methodology:** five views over
+  one applied scenario, with profit, cash and loss margins first. Edits stay
+  draft until an explicit **Run scenario**; invalid input keeps the last valid result.
+- **Policy comparison:** Conservative, Balanced and Aggressive are ranked by
+  full-runoff operating profit among policies that meet the loss cap and cash
+  floor. A pinned baseline shows deltas against a later run.
+- **Stress and capital cases:** one-click examples, a 20-case default/funding
+  grid, cohort cutoffs and exact capital-gap figures.
+- **Exports:** CSV package with manifest, audit workbook and Markdown decision
+  brief, each generated only when requested; the same runs reproduce through the CLI.
+
+## Current state
+
+`main` at `2d7ddbb` (October 16, 2026) is model version `0.1.1`. It includes the
+finance-workbench interface ([PR #4](https://github.com/rishabbshankar226/Lending-Profitability-Risk-Simulator/pull/4))
+and the numerical, input-boundary and installed-package audit
+([PR #6](https://github.com/rishabbshankar226/Lending-Profitability-Risk-Simulator/pull/6)).
+[CI run 38916063015](https://github.com/rishabbshankar226/Lending-Profitability-Risk-Simulator/actions/runs/38916063015)
+passed on that commit: dependency consistency, Ruff, strict mypy, 200 tests,
+compilation and the base-case CLI export, then real-Chromium checks (10 acceptance,
+2 export-resilience and 3 accessibility/zoom journeys, plus 2 reference captures).
+The [audit ledger](docs/AUDIT_2026-10-15.md) records revision-specific results and
+the [approved development-tooling record](docs/DEVELOPMENT_TOOLING_APPROVAL.md).
+The hosted app has not been switched to this revision.
 
 ## Architecture
 
